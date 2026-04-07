@@ -141,3 +141,70 @@ export async function scanRecentHistory(
 
   return findings;
 }
+
+//Core: full history walk with progress callback
+export async function* auditFullHistory(
+  repoPath: string,
+  fromCheckpoint?: string,
+): AsyncGenerator<
+  GitCommitFinding,
+  { totalScanned: number; checkpoint: string | null },
+  unknown
+> {
+  const git = simpleGit(repoPath);
+  let totalScanned = 0;
+  let checkpoint: string | null = null;
+
+  let allHashes: string[];
+  try {
+    const list = await git.raw('rev-list', '--all');
+    allHashes = list.split('\n').filter(Boolean);
+
+    // resume from checkpoint
+    if (fromCheckpoint) {
+      const idx = allHashes.indexOf(fromCheckpoint);
+      if (idx !== -1) allHashes = allHashes.slice(idx + 1);
+    }
+  } catch {
+    return { totalScanned: 0, checkpoint: null };
+  }
+
+  for (const hash of allHashes) {
+    let logEntry;
+    try {
+      logEntry = (await git.log({ maxCount: 1, from: hash })).latest;
+    } catch {
+      continue;
+    }
+
+    if (!logEntry) continue;
+
+    const diff = await git.show([hash, '--unified=0']);
+    const changedLines = diff
+      .split('\n')
+      .filter(
+        (line) =>
+          (line.startsWith('+') || line.startsWith('-')) &&
+          !line.startsWith('---') &&
+          !line.startsWith('+++'),
+      );
+
+    for (const line of changedLines) {
+      const lineFindings = analyzeLine(
+        line,
+        hash,
+        logEntry.author_name || 'unknown',
+        logEntry.date || '',
+      );
+
+      for (const f of lineFindings) {
+        yield { ...f, path: `git:${hash}` };
+      }
+    }
+
+    totalScanned++;
+    checkpoint = hash;
+  }
+
+  return { totalScanned, checkpoint };
+}
