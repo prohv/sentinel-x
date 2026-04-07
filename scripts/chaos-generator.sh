@@ -4,11 +4,11 @@
 # Builds a chaotic test repo with injected secrets and ground-truth oracle.
 # Usage: bash chaos-generator.sh [--commits N] [--output DIR]
 
-set -euo pipefail
+set -e
 
 #Config
 TOTAL_COMMITS=120
-OUTPUT_DIR="./chaos-demo"
+TARGET_DIR="../sentinel-chaos-demo"
 REPO_NAME="chaos-repo"
 BRANCH_COUNTER=0
 ORACLE_COUNT=0
@@ -17,7 +17,7 @@ ORACLE_COUNT=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --commits) TOTAL_COMMITS="$2"; shift 2;;
-    --output)  OUTPUT_DIR="$2"; shift 2;;
+    --output)  TARGET_DIR="$2"; shift 2;;
     --help)
       echo "Usage: bash chaos-generator.sh [--commits N] [--output DIR]"
       exit 0;;
@@ -25,8 +25,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-REPO_PATH="${OUTPUT_DIR}/${REPO_NAME}"
-ORACLE_FILE="${OUTPUT_DIR}/ground_truth.json"
+REPO_PATH="${TARGET_DIR}/${REPO_NAME}"
+ORACLE_FILE="${TARGET_DIR}/ground_truth.json"
 
 #Helpers
 cyan()  { echo -e "\033[0;36m$1\033[0m"; }
@@ -345,17 +345,22 @@ branch_inject() {
 
 #Core
 main() {
+  #Safety check — ensure target dir exists or create it
+  if [[ ! -d "$TARGET_DIR" ]]; then
+    mkdir -p "$TARGET_DIR" || { echo "ERROR: Cannot create ${TARGET_DIR}"; exit 1; }
+  fi
+
+  #Clean slate
+  rm -rf "${TARGET_DIR:?}"/*
+  rm -rf "${TARGET_DIR:?}"/.[!.]* 2>/dev/null || true
+
   chaos "═══════════════════════════════════════════════════"
   chaos "  Sentinel-X Chaos Generator"
   chaos "═══════════════════════════════════════════════════"
   info "Commits:  ${TOTAL_COMMITS}"
-  info "Output:   ${OUTPUT_DIR}"
+  info "Output:   ${TARGET_DIR}"
   info "Repo:     ${REPO_PATH}"
   echo ""
-
-  #Cleanup
-  rm -rf "$OUTPUT_DIR"
-  mkdir -p "$OUTPUT_DIR"
 
   #Init repo
   mkdir -p "$REPO_PATH"
