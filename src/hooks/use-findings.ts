@@ -13,6 +13,7 @@ export function useFindings(filters?: FindingsFilters) {
   return useQuery<FindingsResult>({
     queryKey: ['findings', filters],
     queryFn: () => getFindings(filters),
+    refetchInterval: 5000,
     staleTime: 1000,
   });
 }
