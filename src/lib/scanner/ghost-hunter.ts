@@ -103,3 +103,71 @@ async function loadEnvKeys(): Promise<Set<string>> {
   }
   return keys;
 }
+
+//Core
+export async function* ghostHunter(
+  rootDir: string = process.cwd(),
+): AsyncGenerator<GhostFinding, void, unknown> {
+  const envKeys = await loadEnvKeys();
+
+  //async file discovery
+  const scanner = new Glob('**/*').scan({ dot: true, cwd: rootDir });
+
+  for await (const filePath of scanner) {
+    const fullPath = path.join(rootDir, filePath);
+
+    //skip extra
+    const parts = filePath.split(/[\\/]/);
+    if (parts.some((part: string) => IGNORED_DIRS.has(part))) continue;
+
+    //read file
+    const file = Bun.file(fullPath);
+    if (file.size > MAX_FILE_SIZE) continue;
+    if (file.size === 0) continue;
+
+    const text = await file.text();
+    const lines = text.split('\n');
+
+    // + entropy + taint analysis
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum];
+
+      for (const rule of PATTERNS) {
+        // Reset regex state
+        rule.regex.lastIndex = 0;
+        let match: RegExpExecArray | null;
+
+        while ((match = rule.regex.exec(line)) !== null) {
+          const matched = match[0];
+
+          //Entropy boost for unknown formats
+          let confidence = 0.7; //baseline for pattern match
+          if (rule.entropyThreshold !== undefined) {
+            const entropy = shannonEntropy(matched);
+            if (entropy >= rule.entropyThreshold) {
+              confidence = Math.min(1, confidence + 0.2);
+            }
+          }
+
+          //Taint check
+          for (const key of envKeys) {
+            if (line.includes(key) && filePath !== '.env') {
+              confidence = 1.0;
+              break;
+            }
+          }
+
+          //yield structured finding
+          yield {
+            path: filePath,
+            line: lineNum + 1, // 1-based for display
+            confidence,
+            snippet: extractSnippet(line, matched),
+            rule: rule.name,
+            severity: rule.severity,
+          };
+        }
+      }
+    }
+  }
+}
