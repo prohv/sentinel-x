@@ -1,9 +1,16 @@
+import { spawn } from 'node:child_process';
 import simpleGit from 'simple-git';
 import { PATTERNS } from './patterns';
 import type { GitCommitFinding, TraceResult } from '@/types/scanner';
 
 //Consts
 const COMMIT_DEPTH = 50;
+
+//Sieve — fast gate for clean lines
+const MASTER_PATTERN = new RegExp(
+  PATTERNS.map((p) => p.regex.source).join('|'),
+  'gi',
+);
 
 //Snippet Extractor
 function extractSnippet(lineContent: string, match: string): string {
@@ -27,6 +34,9 @@ function analyzeLine(
   date: string,
 ): Omit<GitCommitFinding, 'path'>[] {
   const findings: Omit<GitCommitFinding, 'path'>[] = [];
+
+  //fast gate: skip clean lines
+  if (!MASTER_PATTERN.test(line)) return findings;
 
   for (const rule of PATTERNS) {
     rule.regex.lastIndex = 0;
@@ -145,65 +155,95 @@ export async function scanRecentHistory(
 //Core: full history walk with progress callback
 export async function* auditFullHistory(
   repoPath: string,
-  fromCheckpoint?: string,
+  _fromCheckpoint?: string,
 ): AsyncGenerator<
   GitCommitFinding,
   { totalScanned: number; checkpoint: string | null },
   unknown
 > {
-  const git = simpleGit(repoPath);
   let totalScanned = 0;
   let checkpoint: string | null = null;
 
-  let allHashes: string[];
-  try {
-    const list = await git.raw('rev-list', '--all');
-    allHashes = list.split('\n').filter(Boolean);
+  //single stream
+  const proc = spawn(
+    'git',
+    [
+      'log',
+      '-p',
+      '--all',
+      '--unified=0',
+      '--format=COMMIT_START%n%H%n%an%n%aI',
+    ],
+    { cwd: repoPath },
+  );
 
-    // resume from checkpoint
-    if (fromCheckpoint) {
-      const idx = allHashes.indexOf(fromCheckpoint);
-      if (idx !== -1) allHashes = allHashes.slice(idx + 1);
-    }
-  } catch {
+  if (!proc.stdout) {
     return { totalScanned: 0, checkpoint: null };
   }
 
-  for (const hash of allHashes) {
-    let logEntry;
-    try {
-      logEntry = (await git.log({ maxCount: 1, from: hash })).latest;
-    } catch {
-      continue;
-    }
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let currentHash = '';
+  let currentAuthor = '';
+  let currentDate = '';
+  let lineState: 'idle' | 'hash' | 'author' | 'date' = 'idle';
 
-    if (!logEntry) continue;
+  for await (const chunk of proc.stdout) {
+    buffer += decoder.decode(chunk);
 
-    const diff = await git.show([hash, '--unified=0']);
-    const changedLines = diff
-      .split('\n')
-      .filter(
-        (line) =>
-          (line.startsWith('+') || line.startsWith('-')) &&
-          !line.startsWith('---') &&
-          !line.startsWith('+++'),
-      );
+    while (true) {
+      const nl = buffer.indexOf('\n');
+      if (nl === -1) break;
 
-    for (const line of changedLines) {
-      const lineFindings = analyzeLine(
-        line,
-        hash,
-        logEntry.author_name || 'unknown',
-        logEntry.date || '',
-      );
+      const line = buffer.slice(0, nl);
+      buffer = buffer.slice(nl + 1);
 
-      for (const f of lineFindings) {
-        yield { ...f, path: `git:${hash}` };
+      if (line === 'COMMIT_START') {
+        lineState = 'hash';
+        continue;
+      }
+
+      if (lineState === 'hash') {
+        currentHash = line;
+        currentAuthor = '';
+        currentDate = '';
+        lineState = 'author';
+        continue;
+      }
+
+      if (lineState === 'author') {
+        currentAuthor = line;
+        lineState = 'date';
+        continue;
+      }
+
+      if (lineState === 'date') {
+        currentDate = line;
+        lineState = 'idle';
+        totalScanned++;
+        checkpoint = currentHash;
+        continue;
+      }
+
+      //diff lines
+      if (
+        currentHash &&
+        (line.startsWith('+') || line.startsWith('-')) &&
+        !line.startsWith('---') &&
+        !line.startsWith('+++')
+      ) {
+        const lineFindings = analyzeLine(
+          line,
+          currentHash,
+          currentAuthor || 'unknown',
+          currentDate,
+        );
+
+        for (const f of lineFindings) {
+          yield { ...f, path: `git:${currentHash}` };
+        }
       }
     }
-
-    totalScanned++;
-    checkpoint = hash;
   }
 
   return { totalScanned, checkpoint };
@@ -213,49 +253,99 @@ export async function* auditFullHistory(
 export async function* huntOrphanBlobs(
   repoPath: string,
 ): AsyncGenerator<GitCommitFinding, { totalScanned: number }, unknown> {
-  const git = simpleGit(repoPath);
   let totalScanned = 0;
 
-  let objectsOutput;
+  //collect blob hashes
+  let objectsOutput: string;
   try {
+    const git = simpleGit(repoPath);
     objectsOutput = await git.raw('rev-list', '--objects', '--all', '--reflog');
   } catch {
     return { totalScanned: 0 };
   }
 
-  // extract only blob hashes (lines without a path suffix = commits/trees)
-  const blobLines = objectsOutput
+  const blobs: { hash: string; filePath: string }[] = [];
+  for (const blobLine of objectsOutput
     .split('\n')
-    .filter((line) => line.trim() && line.includes(' '));
-
-  for (const blobLine of blobLines) {
+    .filter((line) => line.trim() && line.includes(' '))) {
     const [hash, ...pathParts] = blobLine.trim().split(' ');
     const filePath = pathParts.join(' ');
+    if (hash && filePath) blobs.push({ hash, filePath });
+  }
 
-    if (!hash || !filePath) continue;
+  if (blobs.length === 0) return { totalScanned: 0 };
 
-    let content;
-    try {
-      content = await git.raw('cat-file', '-p', hash);
-    } catch {
-      continue;
-    }
+  //batch feed all hashes at once
+  const proc = spawn('git', ['cat-file', '--batch'], { cwd: repoPath });
 
-    const lines = content.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const lineFindings = analyzeLine(
-        lines[i],
-        `orphan:${hash}`,
-        'orphan',
-        '',
-      );
+  if (!proc.stdin || !proc.stdout) {
+    return { totalScanned: 0 };
+  }
 
-      for (const f of lineFindings) {
-        yield { ...f, path: `orphan:${filePath}` };
+  //write all hashes to stdin
+  for (const blob of blobs) {
+    proc.stdin.write(blob.hash + '\n');
+  }
+  proc.stdin.end();
+
+  //parse batch output
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let currentFilePath = '';
+  let remainingBytes = 0;
+
+  //build hash→filepath map for lookup
+  const blobMap = new Map(blobs.map((b) => [b.hash, b.filePath]));
+
+  for await (const chunk of proc.stdout) {
+    buffer += decoder.decode(chunk);
+
+    while (true) {
+      if (remainingBytes > 0) {
+        //reading blob content
+        if (buffer.length < remainingBytes) break;
+
+        const content = buffer.slice(0, remainingBytes);
+        buffer = buffer.slice(remainingBytes);
+        remainingBytes = 0;
+
+        //strip trailing \n from content
+        const lines = content.endsWith('\n')
+          ? content.slice(0, -1).split('\n')
+          : content.split('\n');
+
+        for (const line of lines) {
+          const lineFindings = analyzeLine(line, `orphan:batch`, 'orphan', '');
+
+          for (const f of lineFindings) {
+            yield { ...f, path: `orphan:${currentFilePath}` };
+          }
+        }
+
+        totalScanned++;
+        continue;
       }
-    }
 
-    totalScanned++;
+      //parse header: "<hash> blob <size>"
+      const nl = buffer.indexOf('\n');
+      if (nl === -1) break;
+
+      const header = buffer.slice(0, nl);
+      buffer = buffer.slice(nl + 1);
+
+      const parts = header.split(' ');
+      if (parts.length < 3) {
+        //skip malformed headers
+        continue;
+      }
+
+      const hash = parts[0];
+      const size = parseInt(parts[2], 10);
+      if (isNaN(size)) continue;
+
+      currentFilePath = blobMap.get(hash) || '';
+      remainingBytes = size;
+    }
   }
 
   return { totalScanned };
