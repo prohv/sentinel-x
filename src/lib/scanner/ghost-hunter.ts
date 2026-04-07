@@ -53,3 +53,53 @@ const PATTERNS: PatternRule[] = [
     severity: 'high',
   },
 ];
+
+//Entropy Calculation
+function shannonEntropy(input: string): number {
+  if (!input) return 0;
+  const freq: Record<string, number> = {};
+  for (const c of input) freq[c] = (freq[c] || 0) + 1;
+
+  let entropy = 0;
+  const len = input.length;
+  for (const count of Object.values(freq)) {
+    const p = count / len;
+    entropy -= p * Math.log2(p);
+  }
+  return entropy;
+}
+
+//Snippet Extractor
+function extractSnippet(lineContent: string, match: string): string {
+  const idx = lineContent.indexOf(match);
+  if (idx === -1) return lineContent.trim();
+  const start = Math.max(0, idx - 30);
+  const end = Math.min(lineContent.length, idx + match.length + 30);
+  const snippet = lineContent.slice(start, end).trim();
+  return start > 0
+    ? `…${snippet}`
+    : snippet.length < lineContent.length
+      ? `${snippet}…`
+      : snippet;
+}
+
+//ENV Loader (Taint Baseline)
+async function loadEnvKeys(): Promise<Set<string>> {
+  const keys = new Set<string>();
+  try {
+    const envFile = Bun.file('.env');
+    if (envFile.size > 0) {
+      const text = await envFile.text();
+      for (const line of text.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          const [key] = trimmed.split('=');
+          if (key) keys.add(key.trim());
+        }
+      }
+    }
+  } catch {
+    // if .env doesn't exist — no taint baseline
+  }
+  return keys;
+}
