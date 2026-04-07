@@ -1,34 +1,26 @@
 #!/usr/bin/env bash
 # Sentinel-X Chaos Generator
-
-# Builds a chaotic test repo with injected secrets and ground-truth oracle.
 # Usage: bash chaos-generator.sh [--commits N] [--output DIR]
+# Run it outside this folder
 
-set -e
-
-#Config
-TOTAL_COMMITS=120
-TARGET_DIR="../sentinel-chaos-demo"
+TOTAL_COMMITS=60
+TARGET_DIR="./sentinel-chaos-demo"
 REPO_NAME="chaos-repo"
 BRANCH_COUNTER=0
-ORACLE_COUNT=0
+ORACLE_ENTRIES=""
+pending_cleanup=""
 
-#Arg Parse
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --commits) TOTAL_COMMITS="$2"; shift 2;;
     --output)  TARGET_DIR="$2"; shift 2;;
-    --help)
-      echo "Usage: bash chaos-generator.sh [--commits N] [--output DIR]"
-      exit 0;;
-    *) echo "Unknown: $1"; exit 1;;
+    *) shift;;
   esac
 done
 
 REPO_PATH="${TARGET_DIR}/${REPO_NAME}"
 ORACLE_FILE="${TARGET_DIR}/ground_truth.json"
 
-#Helpers
 cyan()  { echo -e "\033[0;36m$1\033[0m"; }
 red()   { echo -e "\033[0;31m$1\033[0m"; }
 green() { echo -e "\033[0;32m$1\033[0m"; }
@@ -40,11 +32,10 @@ chaos() { red "[CHAOS]  $1"; }
 oracle(){ cyan "[ORACLE] $1"; }
 
 rand_elem() {
-  local -n arr=$1
+  local -a arr=("$@")
   echo "${arr[$((RANDOM % ${#arr[@]}))]}"
 }
 
-#Backdate commits across ~12 weeks
 random_date() {
   local weeks=$((RANDOM % 12))
   local days=$((RANDOM % 7))
@@ -53,23 +44,56 @@ random_date() {
     "+%Y-%m-%dT%H:%M:%S" 2>/dev/null || date "+%Y-%m-%dT%H:%M:%S"
 }
 
-#Deep nested path 3-6 levels
-deep_path() {
-  local depth=$((3 + RANDOM % 4))
-  local dirs=("src" "lib" "internal" "legacy" "v1" "tests" "utils" "config" "helpers" "core" "services" "api" "handlers" "models" "controllers" "middleware")
-  local hidden=(".cache" ".config" ".local" ".build" ".temp" ".webpack" ".next")
-  local bases=("config" "settings" "credentials" "auth" "connection" "database" "service" "handler" "util" "helper" "constants" "env")
-  local exts=("json" "yaml" "yml" "env" "ts" "tsx" "js" "go" "py" "conf" "cfg" "ini" "xml" "toml")
+rand_alnum() {
+  local len="${1:-24}"
+  local out=""
+  local chars="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+  for ((i=0; i<len; i++)); do
+    out+="${chars:$((RANDOM % 62)):1}"
+  done
+  echo "$out"
+}
 
-  local path=""
-  for ((i=0; i<depth; i++)); do
+rand_upper() {
+  local len="${1:-16}"
+  local out=""
+  local chars="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  for ((i=0; i<len; i++)); do
+    out+="${chars:$((RANDOM % 36)):1}"
+  done
+  echo "$out"
+}
+
+rand_hex() {
+  local len="${1:-32}"
+  local out=""
+  local chars="0123456789abcdef"
+  for ((i=0; i<len; i++)); do
+    out+="${chars:$((RANDOM % 16)):1}"
+  done
+  echo "$out"
+}
+
+deep_path() {
+  local depth=$((3 + RANDOM % 3))
+  local dirs=(src lib internal legacy v1 tests utils config helpers core services api)
+  local hidden=(.cache .config .local .build .temp .webpack .next)
+  local bases=(config settings credentials auth connection database service handler util constants env)
+  local exts=(json yaml yml env ts tsx js go py conf cfg)
+
+  if ((RANDOM % 5 == 0)); then
+    local path="$(rand_elem "${hidden[@]}")"
+  else
+    local path="$(rand_elem "${dirs[@]}")"
+  fi
+  for ((i=1; i<depth; i++)); do
     if ((RANDOM % 5 == 0)); then
-      path+="/$(rand_elem hidden)"
+      path+="/$(rand_elem "${hidden[@]}")"
     else
-      path+="/$(rand_elem dirs)"
+      path+="/$(rand_elem "${dirs[@]}")"
     fi
   done
-  path+="/$(rand_elem bases).$(rand_elem exts)"
+  path+="/$(rand_elem "${bases[@]}").$(rand_elem "${exts[@]}")"
   echo "$path"
 }
 
@@ -81,129 +105,154 @@ commit_msg() {
     "chore: update dependencies and lock files"
     "docs: add API documentation for endpoints"
     "test: add integration tests for payment flow"
-    "style: improve component styling and responsiveness"
+    "style: improve component styling"
     "perf: optimize database query performance"
     "ci: configure automated deployment pipeline"
-    "build: update webpack configuration for prod"
-    "feat: implement real-time notification system"
+    "build: update webpack configuration"
+    "feat: implement real-time notifications"
     "fix: handle edge cases in form validation"
-    "refactor: simplify error handling patterns"
-    "chore: migrate to new configuration format"
-    "feat: add export functionality for reports"
-    "fix: correct timezone conversion in scheduler"
-    "test: add unit tests for auth middleware"
-    "docs: update README with setup instructions"
-    "perf: reduce bundle size by 40%"
-    "feat: implement caching layer for API responses"
+    "refactor: simplify error handling"
+    "chore: migrate to new config format"
+    "feat: add export functionality"
+    "fix: correct timezone conversion"
+    "test: add unit tests for auth"
+    "docs: update README instructions"
+    "perf: reduce bundle size"
+    "feat: implement caching layer"
   )
   echo "${msgs[$((RANDOM % ${#msgs[@]}))]}"
 }
 
-#Boilerplate fixtures
-boilerplate() {
-  local kind=$((RANDOM % 4))
-  case $kind in
-    0) cat << 'EOF'
+# ── Boilerplate: real components ──
+boilerplate_component() {
+  local name="$1"
+  cat << EOF
 import React, { useState, useEffect } from "react";
 
-interface UserProps { id: string; name: string; email: string; }
+interface ${name}Props {
+  id?: string;
+  title?: string;
+}
 
-export const UserProfile: React.FC<UserProps> = ({ id, name, email }) => {
+export const ${name}: React.FC<${name}Props> = ({ id, title }) => {
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<UserProps | null>(null);
+  const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    fetch(`/api/users/${id}`)
+    fetch(\`/api/${name.toLowerCase()}/\${id}\`)
       .then((res) => res.json())
-      .then((data) => { setUser(data); setLoading(false); })
+      .then((d) => { setData(d); setLoading(false); })
       .catch((err) => console.error(err));
   }, [id]);
 
-  if (loading) return <div>Loading...</div>;
-  if (!user) return <div>User not found</div>;
+  if (loading) return <div className="spinner">Loading...</div>;
+  if (!data) return <div>Not found</div>;
 
-  return <div className="user-profile"><h2>{user.name}</h2><p>{user.email}</p></div>;
+  return (
+    <div className="${name.toLowerCase()}-card">
+      <h2>{title || data.name}</h2>
+      <p>{data.description}</p>
+    </div>
+  );
 };
 EOF
-      ;;
-    1) cat << 'EOF'
-package handler
-
-import (
-	"net/http"
-	"encoding/json"
-	"log"
-)
-
-type Response struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-	Code    int    `json:"code"`
 }
 
-func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	resp := Response{Status: "ok", Message: "Service is healthy", Code: 200}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
-}
-EOF
-      ;;
-    2) cat << 'EOF'
-export function debounce(fn, delay = 300) {
-  let timeoutId;
-  return function (...args) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn.apply(this, args), delay);
-  };
+boilerplate_lib() {
+  local name="$1"
+  cat << EOF
+/**
+ * ${name} utility module
+ */
+
+interface ${name}Options {
+  timeout?: number;
+  retries?: number;
+  debug?: boolean;
 }
 
-export function throttle(fn, limit = 500) {
-  let inThrottle;
-  return function (...args) {
-    if (!inThrottle) {
-      fn.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
+const DEFAULT_OPTS: ${name}Options = {
+  timeout: 5000,
+  retries: 3,
+  debug: false,
+};
+
+export function ${name}Init(opts?: ${name}Options) {
+  const config = { ...DEFAULT_OPTS, ...opts };
+  console.log("[${name}] initialized with", config);
+  return { config };
+}
+
+export async function ${name}Fetch(url: string, opts?: ${name}Options) {
+  const c = ${name}Init(opts);
+  const res = await fetch(url, { signal: AbortSignal.timeout(c.config.timeout) });
+  if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+  return res.json();
+}
+
+export function ${name}Parse(raw: unknown) {
+  if (typeof raw === "string") return JSON.parse(raw);
+  return raw;
 }
 EOF
-      ;;
-    3) cat << 'EOF'
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
 }
 
-.card {
-  background: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease;
+boilerplate_api() {
+  local name="$1"
+  cat << EOF
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "missing id" }, { status: 400 });
+  return NextResponse.json({ id, name: "${name}" });
 }
 
-.card:hover { transform: translateY(-4px); }
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+  return NextResponse.json({ created: true, ...body }, { status: 201 });
+}
 EOF
-      ;;
-  esac
 }
 
-#Secret generators
-gen_aws()      { echo "AKIA$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' | tr 'a-f' 'A-F' | head -c 16)"; }
-gen_stripe()   { local m=$([ $((RANDOM % 2)) -eq 0 ] && echo "live" || echo "test"); echo "sk_${m}_$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 24)"; }
-gen_github()   { echo "ghp_$(head -c 36 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 36)"; }
-gen_apikey()   { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 32; }
-gen_entropy()  { head -c 64 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 64; }
-gen_password() { head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 16; }
+boilerplate_test() {
+  local name="$1"
+  cat << EOF
+import { describe, it, expect } from "vitest";
+import { ${name}Init, ${name}Fetch } from "../${name}";
+
+describe("${name}", () => {
+  it("should init with defaults", () => {
+    const { config } = ${name}Init();
+    expect(config.timeout).toBe(5000);
+    expect(config.retries).toBe(3);
+  });
+
+  it("should override options", () => {
+    const { config } = ${name}Init({ timeout: 1000 });
+    expect(config.timeout).toBe(1000);
+  });
+
+  it("should throw on bad url", async () => {
+    await expect(${name}Fetch("bad-url")).rejects.toThrow();
+  });
+});
+EOF
+}
+
+# ── Secret generators ──
+gen_aws()         { echo "AKIA$(rand_upper 16)"; }
+gen_stripe()      { local m="live"; ((RANDOM % 2 == 0)) && m="test"; echo "sk_${m}_$(rand_alnum 24)"; }
+gen_github()      { echo "ghp_$(rand_alnum 36)"; }
+gen_apikey()      { echo "$(rand_hex 32)"; }
+gen_entropy()     { echo "$(rand_hex 64)"; }
+gen_password()    { echo "$(rand_alnum 16)"; }
+gen_slack()       { echo "xoxb-$(rand_hex 12)-$(rand_hex 24)-$(rand_alnum 24)"; }
+gen_sendgrid()    { echo "SG.$(rand_alnum 22).$(rand_alnum 43)"; }
+gen_twilio()      { echo "$(rand_hex 32)"; }
+
+SECRET_TYPES=(aws stripe github apikey entropy password slack sendgrid twilio)
 
 gen_private_key() {
   cat << 'PRIVKEY'
@@ -215,344 +264,519 @@ L4mP9vQ6xR7cS3fN5pL8mK2vT9xQ6yR4cP7fL3nM5vK8wQ2zT6cY9fU2oL5mQ8v
 PRIVKEY
 }
 
-SECRET_TYPES=("aws" "stripe" "github" "apikey" "entropy" "password" "private_key")
-
-#Oracle
-oracle_init() {
-  echo "[" > "$ORACLE_FILE"
-}
-
+# ── Oracle ──
 oracle_log() {
-  local secret_type="$1" commit_hash="$2" file_path="$3" line_num="$4" secret_value="$5" lifecycle="$6"
-
-  if ((ORACLE_COUNT > 0)); then
-    local tmp
-    tmp=$(head -c -1 "$ORACLE_FILE" 2>/dev/null || cat "$ORACLE_FILE")
-    echo "${tmp}," > "$ORACLE_FILE"
-  fi
-
-  local escaped
-  escaped=$(echo "$secret_value" | sed 's/\\/\\\\/g; s/"/\\"/g' | head -c 200)
-
-  cat >> "$ORACLE_FILE" << ENTRY
-  {
-    "secretType": "${secret_type}",
-    "commitHash": "${commit_hash}",
-    "filePath": "${file_path}",
-    "lineNumber": ${line_num},
-    "secretValue": "${escaped}",
-    "lifecycle": "${lifecycle}"
-  }
-ENTRY
-
-  ORACLE_COUNT=$((ORACLE_COUNT + 1))
+  local st="$1" ch="$2" fp="$3" ln="$4" sv="$5" lc="$6"
+  ORACLE_ENTRIES="${ORACLE_ENTRIES}    {\"secretType\":\"${st}\",\"commitHash\":\"${ch}\",\"filePath\":\"${fp}\",\"lineNumber\":${ln},\"lifecycle\":\"${lc}\"},"
 }
 
-oracle_close() {
-  echo "]" >> "$ORACLE_FILE"
-  oracle "Oracle sealed: ${ORACLE_COUNT} secrets logged to ground_truth.json"
-}
-
-#Inject secret — echoes: type|path|line|value
+# ── Inject secret into a file ──
 inject_secret() {
   local secret_type="$1" file_path="$2"
   local secret_value="" content="" line_num=0
+  local existing=""
 
-  mkdir -p "$(dirname "${REPO_PATH}/${file_path}")"
+  local dir
+  dir="$(dirname "$file_path")"
+  mkdir -p "$dir" || { echo "ERROR: mkdir failed for $dir"; return 1; }
+
+  # Load existing content if file exists
+  if [[ -f "$file_path" ]]; then
+    existing=$(cat "$file_path")
+  fi
 
   case "$secret_type" in
     aws)
       secret_value=$(gen_aws)
-      if ((RANDOM % 2 == 0)); then
-        content="const AWS_CONFIG = {\n  accessKeyId: '${secret_value}',\n  region: 'us-east-1'\n};\nmodule.exports = AWS_CONFIG;"
-        line_num=2
-      else
-        content="# TODO: remove before production\n# AWS_ACCESS_KEY=${secret_value}\nDATABASE_URL=postgres://localhost:5432/db"
-        line_num=2
-      fi
-      ;;
+      content="AWS_ACCESS_KEY_ID=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
     stripe)
       secret_value=$(gen_stripe)
-      content="const stripe = require('stripe');\nconst client = new stripe('${secret_value}');\n\nmodule.exports = client;"
-      line_num=2
-      ;;
+      content="STRIPE_SECRET_KEY=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
     github)
       secret_value=$(gen_github)
-      content="# GitHub Integration\nGITHUB_TOKEN=${secret_value}\nREPO_OWNER=myorg\nREPO_NAME=myrepo"
-      line_num=2
-      ;;
+      content="GITHUB_TOKEN=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
     apikey)
       secret_value=$(gen_apikey)
-      content="{\n  \"api_key\": \"${secret_value}\",\n  \"endpoint\": \"https://api.example.com/v2\",\n  \"timeout\": 5000\n}"
-      line_num=2
-      ;;
+      content="API_KEY=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
     entropy)
       secret_value=$(gen_entropy)
-      content="export const ENCRYPTION_KEY = '${secret_value}';\nexport const IV_LENGTH = 16;\nexport const ALGORITHM = 'aes-256-gcm';"
-      line_num=1
-      ;;
+      content="ENCRYPTION_SECRET=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
     password)
       secret_value=$(gen_password)
-      content="const DB_PASSWORD = '${secret_value}';\nconst DB_HOST = 'localhost';\nconst DB_PORT = 5432;"
-      line_num=1
-      ;;
-    private_key)
-      secret_value="-----BEGIN RSA PRIVATE KEY-----"
-      local privkey
-      privkey=$(gen_private_key)
-      content="# Server SSL Certificate\n${privkey}\n# End of certificate"
-      line_num=2
-      ;;
+      content="DB_PASSWORD=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
+    slack)
+      secret_value=$(gen_slack)
+      content="SLACK_BOT_TOKEN=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
+    sendgrid)
+      secret_value=$(gen_sendgrid)
+      content="SENDGRID_API_KEY=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
+    twilio)
+      secret_value=$(gen_twilio)
+      content="TWILIO_AUTH_TOKEN=${secret_value}"
+      line_num=$((RANDOM % 5 + 1));;
   esac
 
-  echo -e "$content" > "${REPO_PATH}/${file_path}"
+  # Append to existing or create new
+  if [[ -n "$existing" ]]; then
+    printf '%s\n%s\n' "$existing" "$content" > "$file_path"
+  else
+    printf '%s\n' "$content" > "$file_path"
+  fi
+
   echo "${secret_type}|${file_path}|${line_num}|${secret_value}"
 }
 
-#Branch with secret
-branch_inject() {
-  local branch_name="feature/leak-$((++BRANCH_COUNTER))"
-  chaos "Abandoned branch: ${branch_name}"
+# ── Inject secret inline into source code ──
+inject_inline_secret() {
+  local secret_type="$1" file_path="$2"
+  local secret_value="" line_content="" line_num=0
+  local existing=""
 
-  git checkout -b "$branch_name" 2>/dev/null
+  local dir
+  dir="$(dirname "$file_path")"
+  mkdir -p "$dir" || return 1
 
-  local path
-  path=$(deep_path)
-  local result
-  result=$(inject_secret "$(rand_elem SECRET_TYPES)" "$path")
-
-  local stype fpath lnum secret
-  stype=$(echo "$result" | cut -d'|' -f1)
-  fpath=$(echo "$result" | cut -d'|' -f2)
-  lnum=$(echo "$result" | cut -d'|' -f3)
-  secret=$(echo "$result" | cut -d'|' -f4)
-
-  local ext="${path##*.}"
-  boilerplate > "src/feature_${BRANCH_COUNTER}.${ext}"
-  git add -A
-
-  local cdate
-  cdate=$(random_date)
-  GIT_COMMITTER_DATE="$cdate" git commit -m "feat: experimental ${branch_name}" --date="$cdate" --allow-empty
-
-  local hash
-  hash=$(git rev-parse HEAD)
-  oracle_log "$stype" "$hash" "$fpath" "$lnum" "$secret" "branch"
-
-  git checkout main 2>/dev/null || git checkout master 2>/dev/null
-  ok "Branch '${branch_name}' abandoned with secret at: ${fpath}"
-}
-
-#Core
-main() {
-  #Safety check — ensure target dir exists or create it
-  if [[ ! -d "$TARGET_DIR" ]]; then
-    mkdir -p "$TARGET_DIR" || { echo "ERROR: Cannot create ${TARGET_DIR}"; exit 1; }
+  if [[ -f "$file_path" ]]; then
+    existing=$(cat "$file_path")
   fi
 
-  #Clean slate
-  rm -rf "${TARGET_DIR:?}"/*
+  case "$secret_type" in
+    aws)
+      secret_value=$(gen_aws)
+      line_content="  accessKeyId: '${secret_value}',";;
+    stripe)
+      secret_value=$(gen_stripe)
+      line_content="const stripe = new Stripe('${secret_value}');";;
+    github)
+      secret_value=$(gen_github)
+      line_content="const token = '${secret_value}';";;
+    apikey)
+      secret_value=$(gen_apikey)
+      line_content="const apiKey = '${secret_value}';";;
+    password)
+      secret_value=$(gen_password)
+      line_content="// TODO: change default password '${secret_value}'";;
+    slack)
+      secret_value=$(gen_slack)
+      line_content="const SLACK_TOKEN = '${secret_value}';";;
+    entropy)
+      secret_value=$(gen_entropy)
+      line_content="export const SECRET = '${secret_value}';";;
+  esac
+
+  if [[ -n "$existing" ]]; then
+    printf '%s\n%s\n' "$existing" "$line_content" > "$file_path"
+  else
+    printf '%s\n' "$line_content" > "$file_path"
+  fi
+
+  echo "${secret_type}|${file_path}|${line_num}|${secret_value}"
+}
+
+do_commit() {
+  git add -A >/dev/null 2>&1
+  GIT_COMMITTER_DATE="$2" git commit -m "$1" --date="$2" --allow-empty >/dev/null 2>&1 || true
+}
+
+branch_inject() {
+  local branch_name="feature/leak-$((++BRANCH_COUNTER))"
+  chaos "  Branch: ${branch_name}"
+  git checkout -b "$branch_name" 2>/dev/null || return 0
+
+  # Pick a random secret type not in .env
+  local stype
+  stype=$(rand_elem aws stripe github slack password entropy apikey)
+
+  local fpath
+  if ((RANDOM % 3 == 0)); then
+    fpath=$(deep_path)
+  else
+    fpath="$(rand_elem src lib internal config)/$(rand_elem credentials secrets config auth).$(rand_elem json yaml env ts js)"
+  fi
+
+  local result
+  result=$(inject_secret "$stype" "$fpath")
+  if [[ $? -ne 0 || -z "$result" ]]; then
+    git checkout main 2>/dev/null || git checkout master 2>/dev/null || true
+    return 0
+  fi
+
+  local lnum secret
+  IFS='|' read -r _ _ lnum secret <<< "$result"
+
+  mkdir -p src/lib
+  boilerplate_lib "Branch${BRANCH_COUNTER}" > "src/lib/branch_${BRANCH_COUNTER}.ts"
+  do_commit "feat: experimental ${branch_name}" "$(random_date)"
+  oracle_log "$stype" "$(git rev-parse HEAD)" "$fpath" "$lnum" "$secret" "branch"
+  git checkout main 2>/dev/null || git checkout master 2>/dev/null || true
+  ok "  Abandoned at: ${fpath}"
+}
+
+# ── Build project skeleton ──
+build_skeleton() {
+  local components=(Dashboard Navbar Sidebar Auth Modal Table Chart Form Card Button Header Footer Layout Provider)
+  local libs=(api auth db cache config logger middleware schema utils hooks validators helpers formatters parsers)
+  local apis=(users posts comments products orders payments notifications webhooks uploads sessions)
+  local tests=("api.test" "auth.test" "utils.test" "schema.test" "config.test")
+
+  # .env.local with 25-30 secrets (Feature: taint baseline)
+  chaos "  Seeding .env.local with 28 secrets..."
+  {
+    echo "# App"
+    echo "NODE_ENV=development"
+    echo "PORT=3000"
+    echo ""
+    echo "# Database"
+    echo "DATABASE_URL=postgres://admin:$(gen_password)@db.example.com:5432/production"
+    echo "REDIS_URL=redis://cache:$(gen_password)@redis.example.com:6379"
+    echo "MONGODB_URI=mongodb://root:$(gen_password)@cluster0.example.com:27017/app"
+    echo ""
+    echo "# AWS"
+    echo "AWS_ACCESS_KEY_ID=$(gen_aws)"
+    echo "AWS_SECRET_ACCESS_KEY=$(rand_hex 40)"
+    echo "AWS_REGION=us-east-1"
+    echo ""
+    echo "# Stripe"
+    echo "STRIPE_SECRET_KEY=$(gen_stripe)"
+    echo "STRIPE_PUBLISHABLE_KEY=pk_live_$(rand_alnum 24)"
+    echo "STRIPE_WEBHOOK_SECRET=$(rand_hex 32)"
+    echo ""
+    echo "# GitHub"
+    echo "GITHUB_TOKEN=$(gen_github)"
+    echo "GITHUB_CLIENT_SECRET=$(rand_hex 32)"
+    echo ""
+    echo "# Third-party APIs"
+    echo "SENDGRID_API_KEY=$(gen_sendgrid)"
+    echo "SLACK_BOT_TOKEN=$(gen_slack)"
+    echo "TWILIO_AUTH_TOKEN=$(gen_twilio)"
+    echo "API_KEY=$(gen_apikey)"
+    echo "API_SECRET=$(gen_apikey)"
+    echo ""
+    echo "# Auth"
+    echo "JWT_SECRET=$(rand_hex 32)"
+    echo "SESSION_SECRET=$(rand_hex 32)"
+    echo "ENCRYPTION_KEY=$(gen_entropy)"
+    echo ""
+    echo "# Misc"
+    echo "ADMIN_PASSWORD=$(gen_password)"
+    echo "BACKUP_PASSWORD=$(gen_password)"
+    echo "DEPLOY_KEY=$(gen_entropy)"
+    echo "PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----"
+  } > ".env.local"
+  oracle_log "env-baseline" "" ".env.local" 0 "" "active"
+
+  # package.json
+  cat > "package.json" << 'PKG'
+{
+  "name": "chaos-app",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "next": "^16.0.0",
+    "stripe": "^17.0.0"
+  }
+}
+PKG
+
+  # tsconfig
+  cat > "tsconfig.json" << 'TSC'
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "strict": true,
+    "moduleResolution": "bundler",
+    "paths": { "@/*": ["./src/*"] }
+  }
+}
+TSC
+
+  # next.config
+  cat > "next.config.ts" << 'NXC'
+import type { NextConfig } from "next";
+const config: NextConfig = {};
+export default config;
+NXC
+
+  # gitignore
+  cat > ".gitignore" << 'GIT'
+node_modules/
+.next/
+.env
+*.log
+GIT
+
+  # src structure
+  mkdir -p src/{components/{ui,layout,auth,forms,dashboard},lib/{api,db,auth,utils},pages/api/{users,products,auth},tests}
+
+  # Generate components
+  for comp in "${components[@]}"; do
+    boilerplate_component "$comp" > "src/components/ui/${comp}.tsx"
+  done
+
+  # Generate lib files
+  for lib in "${libs[@]}"; do
+    boilerplate_lib "$lib" > "src/lib/${lib}.ts"
+  done
+
+  # Generate API routes
+  for api in "${apis[@]}"; do
+    boilerplate_api "$api" > "src/pages/api/${api}/route.ts"
+  done
+
+  # Generate tests
+  for t in "${tests[@]}"; do
+    boilerplate_test "$t" > "src/tests/${t}.ts"
+  done
+
+  do_commit "chore: scaffold project" "$(random_date)"
+  ok "Skeleton built"
+}
+
+# ── Main ──
+main() {
+  mkdir -p "$TARGET_DIR" || { echo "ERROR: cannot create $TARGET_DIR"; exit 1; }
+  rm -rf "${TARGET_DIR:?}"/* 2>/dev/null || true
   rm -rf "${TARGET_DIR:?}"/.[!.]* 2>/dev/null || true
 
-  chaos "═══════════════════════════════════════════════════"
-  chaos "  Sentinel-X Chaos Generator"
-  chaos "═══════════════════════════════════════════════════"
-  info "Commits:  ${TOTAL_COMMITS}"
-  info "Output:   ${TARGET_DIR}"
-  info "Repo:     ${REPO_PATH}"
+  chaos "Sentinel-X Chaos Generator"
+  chaos "═══════════════════════════════════"
+  info "Commits: ${TOTAL_COMMITS}"
+  info "Output:  ${TARGET_DIR}"
   echo ""
 
-  #Init repo
-  mkdir -p "$REPO_PATH"
-  (cd "$REPO_PATH" && git init && git config user.name "Chaos Agent" && git config user.email "chaos@sentinel-x.dev")
+  mkdir -p "$REPO_PATH" || { echo "ERROR: cannot create $REPO_PATH"; exit 1; }
+  cd "$REPO_PATH" || { echo "ERROR: cd failed"; exit 1; }
+  git init >/dev/null 2>&1 || { echo "ERROR: git init failed"; exit 1; }
+  git config user.name "Chaos Agent"
+  git config user.email "chaos@sentinel-x.dev"
 
-  cat > "${REPO_PATH}/README.md" << 'EOF'
-# Chaos Test Repository
+  # Phase 1: Build skeleton + .env.local
+  chaos "Phase 1: Project skeleton..."
+  build_skeleton
 
-Auto-generated by Sentinel-X Chaos Generator.
-Contains intentional fake secrets for scanner testing.
+  echo ""
 
-**DO NOT USE ANY CREDENTIALS HERE**
-EOF
+  # Phase 2: Evolve app with commits
+  chaos "Phase 2: Evolving app (${TOTAL_COMMITS} commits)..."
 
-  mkdir -p "${REPO_PATH}/src"
-  touch "${REPO_PATH}/src/.gitkeep"
-
-  (cd "$REPO_PATH" && git add -A && git commit -m "chore: init" --date="$(random_date)")
-
-  #Init oracle
-  oracle_init
-
-  local pending_cleanup=""
+  local components=(UserProfile Dashboard Settings Modal Form Table Chart Card Header Footer Layout Provider)
+  local libs=(cache formatter parser validator scheduler middleware observer emitter transformer)
+  local apis=(analytics reviews inventory billing reports audit search export)
 
   for ((i=1; i<=TOTAL_COMMITS; i++)); do
-    #Oops lifecycle — cleanup previous secret
-    if [[ -n "$pending_cleanup" ]]; then
-      local action=$((RANDOM % 3))
+    # Oops lifecycle — cleanup previous (30% chance)
+    if [[ -n "$pending_cleanup" ]] && ((RANDOM % 10 < 3)); then
       local cfile="$pending_cleanup"
-      case $action in
-        0) rm -f "${REPO_PATH}/${cfile}"; chaos "  CLEANUP: deleted ${cfile}";;
-        1) echo "$cfile" >> "${REPO_PATH}/.gitignore"
-           rm -f "${REPO_PATH}/${cfile}"
-           chaos "  CLEANUP: gitignored + removed ${cfile}";;
-        2) cat > "${REPO_PATH}/${cfile}" << 'CLEAN'
-# Secrets removed — use environment variables
-API_KEY=${process.env.API_KEY}
-DATABASE_URL=${process.env.DATABASE_URL}
-CLEAN
-           chaos "  CLEANUP: replaced ${cfile} with env vars";;
-      esac
-
-      (cd "$REPO_PATH" && git add -A)
-      local cdate
-      cdate=$(random_date)
-      (cd "$REPO_PATH" && GIT_COMMITTER_DATE="$cdate" git commit -m "fix: remove hardcoded credentials from ${cfile}" --date="$cdate" --allow-empty)
-
-      local chash
-      chash=$(cd "$REPO_PATH" && git rev-parse HEAD)
-      oracle_log "cleanup" "$chash" "$cfile" 0 "" "deleted"
+      local action=$((RANDOM % 3))
+      if ((action == 0)); then
+        rm -f "$cfile" 2>/dev/null || true
+      elif ((action == 1)); then
+        echo "$cfile" >> ".gitignore"
+        rm -f "$cfile" 2>/dev/null || true
+      else
+        printf '# Secrets removed\nAPI_KEY=\nDATABASE_URL=\n' > "$cfile"
+      fi
+      do_commit "fix: remove credentials from ${cfile}" "$(random_date)"
+      oracle_log "cleanup" "$(git rev-parse HEAD)" "$cfile" 0 "" "deleted"
       pending_cleanup=""
     fi
 
-    #Inject secret (70%) or normal commit (30%)
-    if ((RANDOM % 10 < 7)); then
-      local fpath
-      if ((RANDOM % 5 < 2)); then
-        fpath=$(deep_path)
-        chaos "  INJECT deep: ${fpath}"
+    # 35% inject secret, 65% normal
+    if ((RANDOM % 100 < 35)); then
+      # Pick injection type: env file (50%), inline source (30%), config file (20%)
+      local inj_type=$((RANDOM % 10))
+
+      if ((inj_type < 5)); then
+        # Add to .env.local or new env file
+        local env_file=".env.local"
+        if ((RANDOM % 3 == 0)); then
+          env_file="$(rand_elem .env.production .env.staging .env.test .env.development)"
+        fi
+        local result
+        result=$(inject_secret "$(rand_elem "${SECRET_TYPES[@]}")" "$env_file")
+        if [[ $? -eq 0 && -n "$result" ]]; then
+          local stype lnum secret
+          IFS='|' read -r stype _ lnum secret <<< "$result"
+          do_commit "chore: update ${env_file}" "$(random_date)"
+          oracle_log "$stype" "$(git rev-parse HEAD)" "$env_file" "$lnum" "$secret" "active"
+          chaos "  [${i}] env: ${env_file}"
+          pending_cleanup="$env_file"
+        fi
+
+      elif ((inj_type < 8)); then
+        # Inline in source file
+        local src_files=(
+          "src/lib/api.ts"
+          "src/lib/db.ts"
+          "src/lib/auth.ts"
+          "src/lib/config.ts"
+          "src/lib/utils.ts"
+          "src/lib/middleware.ts"
+          "src/pages/api/users/route.ts"
+          "src/pages/api/products/route.ts"
+        )
+        local src_file
+        src_file=$(rand_elem "${src_files[@]}")
+
+        local result
+        result=$(inject_inline_secret "$(rand_elem aws stripe github apikey password slack entropy)" "$src_file")
+        if [[ $? -eq 0 && -n "$result" ]]; then
+          local stype lnum secret
+          IFS='|' read -r stype _ lnum secret <<< "$result"
+          do_commit "$(commit_msg)" "$(random_date)"
+          oracle_log "$stype" "$(git rev-parse HEAD)" "$src_file" "$lnum" "$secret" "active"
+          chaos "  [${i}] inline: ${src_file}"
+          pending_cleanup="$src_file"
+        fi
+
       else
-        local dirs=("src" "lib" "config" "internal" "utils" "api")
-        local bases=("config" "credentials" "auth" "settings" "database" "service")
-        local exts=("json" "yaml" "env" "ts" "js" "go" "py")
-        fpath="$(rand_elem dirs)/$(rand_elem bases).$(rand_elem exts)"
-        chaos "  INJECT: ${fpath}"
+        # Config/secrets file
+        local fpath
+        if ((RANDOM % 4 == 0)); then
+          fpath=$(deep_path)
+          chaos "  [${i}] deep: ${fpath}"
+        else
+          fpath="$(rand_elem src lib config internal)/$(rand_elem credentials secrets config auth database).$(rand_elem json yaml ts env)"
+          chaos "  [${i}] config: ${fpath}"
+        fi
+
+        local result
+        result=$(inject_secret "$(rand_elem "${SECRET_TYPES[@]}")" "$fpath")
+        if [[ $? -eq 0 && -n "$result" ]]; then
+          local stype lnum secret
+          IFS='|' read -r stype _ lnum secret <<< "$result"
+          do_commit "$(commit_msg)" "$(random_date)"
+          oracle_log "$stype" "$(git rev-parse HEAD)" "$fpath" "$lnum" "$secret" "active"
+          pending_cleanup="$fpath"
+        fi
       fi
 
-      local stype
-      stype=$(rand_elem SECRET_TYPES)
-      local result
-      result=$(inject_secret "$stype" "$fpath")
-
-      local line_num secret
-      line_num=$(echo "$result" | cut -d'|' -f3)
-      secret=$(echo "$result" | cut -d'|' -f4)
-
-      mkdir -p "${REPO_PATH}/src"
-      boilerplate > "${REPO_PATH}/src/boilerplate_${i}.ts"
-
-      (cd "$REPO_PATH" && git add -A)
-      local cdate
-      cdate=$(random_date)
-      (cd "$REPO_PATH" && GIT_COMMITTER_DATE="$cdate" git commit -m "$(commit_msg)" --date="$cdate" --allow-empty)
-
-      local hash
-      hash=$(cd "$REPO_PATH" && git rev-parse HEAD)
-      oracle_log "$stype" "$hash" "$fpath" "$line_num" "$secret" "active"
-
-      pending_cleanup="$fpath"
-
-      #Branching entropy every 20 commits
-      if ((i % 20 == 0)); then
+      # Branch every 15 commits
+      if ((i % 15 == 0)); then
         branch_inject
       fi
     else
-      mkdir -p "${REPO_PATH}/src"
-      boilerplate > "${REPO_PATH}/src/update_${i}.ts"
-
-      (cd "$REPO_PATH" && git add -A)
-      local cdate
-      cdate=$(random_date)
-      (cd "$REPO_PATH" && GIT_COMMITTER_DATE="$cdate" git commit -m "$(commit_msg)" --date="$cdate" --allow-empty)
+      # Normal app commit — add component, lib, api route, or test
+      local commit_type=$((RANDOM % 5))
+      case $commit_type in
+        0)
+          local comp
+          comp="$(rand_elem "${components[@]}")_$(printf '%02d' $i)"
+          boilerplate_component "$comp" > "src/components/ui/${comp}.tsx"
+          ;;
+        1)
+          local lib
+          lib="$(rand_elem "${libs[@]}")_$(printf '%02d' $i)"
+          boilerplate_lib "$lib" > "src/lib/${lib}.ts"
+          ;;
+        2)
+          local api
+          api="$(rand_elem "${apis[@]}")_${i}"
+          mkdir -p "src/pages/api/${api}"
+          boilerplate_api "$api" > "src/pages/api/${api}/route.ts"
+          ;;
+        3)
+          boilerplate_test "feature_${i}" > "src/tests/feature_${i}.test.ts"
+          ;;
+        4)
+          # Add a new page + component together
+          local page
+          page="$(rand_elem dashboard admin settings profile billing reports)"
+          mkdir -p "src/pages/${page}"
+          cat > "src/pages/${page}/index.tsx" << PAGEEOF
+import { ${page^} } from "@/components/ui/${page^}";
+export default function ${page^}Page() { return <${page^} />; }
+PAGEEOF
+          boilerplate_component "${page^}" > "src/components/ui/${page^}.tsx"
+          ;;
+      esac
+      do_commit "$(commit_msg)" "$(random_date)"
     fi
-
-    info "  Commit ${i}/${TOTAL_COMMITS}"
   done
 
-  #Cleanup remaining
-  if [[ -n "$pending_cleanup" ]]; then
-    rm -f "${REPO_PATH}/${pending_cleanup}"
-    (cd "$REPO_PATH" && git add -A)
-    local cdate
-    cdate=$(random_date)
-    (cd "$REPO_PATH" && GIT_COMMITTER_DATE="$cdate" git commit -m "security: final credential cleanup" --date="$cdate" --allow-empty)
-    local chash
-    chash=$(cd "$REPO_PATH" && git rev-parse HEAD)
-    oracle_log "cleanup" "$chash" "$pending_cleanup" 0 "" "deleted"
+  # Final cleanup — 50% chance
+  if [[ -n "$pending_cleanup" ]] && ((RANDOM % 2 == 0)); then
+    rm -f "$pending_cleanup" 2>/dev/null || true
+    do_commit "security: final cleanup" "$(random_date)"
+    oracle_log "cleanup" "$(git rev-parse HEAD)" "$pending_cleanup" 0 "" "deleted"
   fi
 
   echo ""
 
-  #Extra abandoned branches
-  info "Creating abandoned feature branches..."
+  # Phase 3: Abandoned branches
+  info "Creating abandoned branches..."
   for bi in 1 2 3 4; do
     branch_inject
     git checkout "feature/leak-${BRANCH_COUNTER}" 2>/dev/null || true
     for j in 1 2 3; do
-      mkdir -p "${REPO_PATH}/src/feat${bi}"
-      boilerplate > "${REPO_PATH}/src/feat${bi}/file${j}.ts"
-      (cd "$REPO_PATH" && git add -A)
-      local cdate
-      cdate=$(random_date)
-      (cd "$REPO_PATH" && GIT_COMMITTER_DATE="$cdate" git commit -m "feat: branch ${bi} commit ${j}" --date="$cdate" --allow-empty)
+      boilerplate_component "Feat${bi}_${j}" > "src/components/ui/feat${bi}_${j}.tsx"
+      do_commit "feat: branch ${bi} commit ${j}" "$(random_date)"
     done
-    git checkout main 2>/dev/null || git checkout master 2>/dev/null
+    git checkout main 2>/dev/null || git checkout master 2>/dev/null || true
   done
 
+  # Hidden file ghosts
   echo ""
-
-  #Hidden file ghosts
-  info "Planting secrets in hidden files..."
-  local hfiles=(".env.local" ".config/credentials.json" ".cache/auth.yml" ".local/db.conf" ".next/env.js")
+  info "Planting hidden file secrets..."
+  local hfiles=(".config/credentials.json" ".cache/auth.yml" ".local/db.conf" ".next/env.js" ".temp/secrets.json")
   for hf in "${hfiles[@]}"; do
-    local stype
-    stype=$(rand_elem SECRET_TYPES)
     local result
-    result=$(inject_secret "$stype" "$hf")
-
-    local fpath lnum secret
-    fpath=$(echo "$result" | cut -d'|' -f2)
-    lnum=$(echo "$result" | cut -d'|' -f3)
-    secret=$(echo "$result" | cut -d'|' -f4)
-
-    (cd "$REPO_PATH" && git add -A)
-    local cdate
-    cdate=$(random_date)
-    (cd "$REPO_PATH" && GIT_COMMITTER_DATE="$cdate" git commit -m "chore: add ${hf}" --date="$cdate" --allow-empty)
-
-    local hash
-    hash=$(cd "$REPO_PATH" && git rev-parse HEAD)
-    oracle_log "$stype" "$hash" "$hf" "$lnum" "$secret" "active"
-
-    chaos "  HIDDEN: ${hf}"
+    result=$(inject_secret "$(rand_elem "${SECRET_TYPES[@]}")" "$hf")
+    if [[ $? -eq 0 && -n "$result" ]]; then
+      local stype lnum secret
+      IFS='|' read -r stype _ lnum secret <<< "$result"
+      do_commit "chore: add ${hf}" "$(random_date)"
+      oracle_log "$stype" "$(git rev-parse HEAD)" "$hf" "$lnum" "$secret" "active"
+      chaos "  HIDDEN: ${hf}"
+    fi
   done
 
-  echo ""
+  # Write oracle
+  if [[ -n "$ORACLE_ENTRIES" ]]; then
+    local clean="${ORACLE_ENTRIES%,}"
+    printf '[\n%s\n]\n' "$clean" > "$ORACLE_FILE"
+  else
+    printf '[]\n' > "$ORACLE_FILE"
+  fi
 
-  #Seal oracle
-  (cd "$REPO_PATH" && git checkout main 2>/dev/null || git checkout master 2>/dev/null)
-  oracle_close
+  git checkout main 2>/dev/null || git checkout master 2>/dev/null || true
 
-  #Summary
   local commits branches files
-  commits=$(cd "$REPO_PATH" && git rev-list --count HEAD)
-  branches=$(cd "$REPO_PATH" && git branch | wc -l | tr -d ' ')
-  files=$(cd "$REPO_PATH" && git ls-files | wc -l | tr -d ' ')
+  commits=$(git rev-list --count HEAD)
+  branches=$(git branch | wc -l | tr -d ' ')
+  files=$(git ls-files | wc -l | tr -d ' ')
+
+  local oracle_count=0
+  if [[ -f "$ORACLE_FILE" ]]; then
+    oracle_count=$(grep -c "secretType" "$ORACLE_FILE" 2>/dev/null || echo 0)
+  fi
 
   echo ""
-  chaos "═══════════════════════════════════════════════════"
+  chaos "═══════════════════════════════════"
   chaos "  CHAOS COMPLETE"
-  chaos "═══════════════════════════════════════════════════"
-  info "Repo:        ${REPO_PATH}"
+  chaos "═══════════════════════════════════"
   info "Commits:     ${commits}"
   info "Branches:    ${branches}"
   info "Files:       ${files}"
-  oracle "Secrets:     ${ORACLE_COUNT}"
+  oracle "Secrets:     ${oracle_count}"
   oracle "Oracle:      ${ORACLE_FILE}"
   echo ""
-  info "Scan with:   sentinel-x scanner on ${REPO_PATH}"
-  info "Verify:      Compare output against ${ORACLE_FILE}"
-  echo ""
-  ok "Chaos repo ready for battle testing!"
+  ok "Ready!"
 }
 
 main
