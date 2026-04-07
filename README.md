@@ -67,7 +67,12 @@ bun lint         # ESLint check
   - **Single-pass taint check**: compiled regex replaces the per-key loop (O(n) → O(1))
   - **Shannon entropy** calculation for unknown-format secret detection
   - **`.env` taint baseline**: flags when `.env` key names appear in source files
-- **Pattern library** — built-in rules for GitHub tokens, Stripe keys, AWS keys, private keys, passwords, connection strings, and generic API keys
+- **Git Scanner** — 4 history scanning functions via `simple-git`:
+  - `traceSecret(secret)` — Pickaxe search to track a secret's full lifecycle across commits
+  - `scanRecentHistory(depth)` — Quick scan of last N commits (pre-push / quick refresh)
+  - `auditFullHistory(fromCheckpoint?)` — Full history walk with incremental checkpointing
+  - `huntOrphanBlobs()` — Finds secrets in deleted branches and dangling `.git/objects`
+- **Pattern library** — shared rules for GitHub tokens, Stripe keys, AWS keys, private keys, passwords, connection strings, and generic API keys
 - **SQLite via Drizzle** — local-only database, zero external dependencies
 - **Type-safe** — full TypeScript with Zod validation and shared types
 - **Pre-commit guard** — Husky + lint-staged hooks
@@ -78,7 +83,6 @@ bun lint         # ESLint check
 
 | Phase | Feature | Description |
 |---|---|---|
-| **Phase 2** | Git Archaeology | Scan commit history and diffs for secrets in deleted/modified lines via `simple-git` |
 | **Phase 2** | Drizzle Schema | Define tables for findings, scan history, and severity stats |
 | **Phase 2** | Better-Auth | Offline auth setup for dashboard access |
 | **Phase 3** | shadcn/ui Dashboard | Real-time scan progress, findings table, severity chart |
@@ -101,7 +105,10 @@ src/
 ├── lib/
 │   ├── auth/          # Better-Auth offline configuration
 │   ├── db/            # Drizzle schema & SQLite client
-│   ├── scanner/       # Ghost Hunter engine
+│   ├── scanner/       # Ghost Hunter + Git Scanner engines
+│   │   ├── ghost-hunter.ts   # Filesystem secret scanner
+│   │   ├── git-scanner.ts    # Git history scanner
+│   │   └── patterns.ts       # Shared pattern rules
 │   └── utils/         # Crypto helpers & regex patterns
 ├── scripts/           # Demo repo generator (attack simulator)
 ├── types/
