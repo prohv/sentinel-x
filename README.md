@@ -83,7 +83,6 @@ bun lint         # ESLint check
 
 | Phase | Feature | Description |
 |---|---|---|
-| **Phase 2** | Drizzle Schema | Define tables for findings, scan history, and severity stats |
 | **Phase 2** | Better-Auth | Offline auth setup for dashboard access |
 | **Phase 3** | shadcn/ui Dashboard | Real-time scan progress, findings table, severity chart |
 | **Phase 3** | TanStack Query | Server-side caching and real-time scan state management |
