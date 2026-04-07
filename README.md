@@ -72,8 +72,14 @@ bun lint         # ESLint check
   - `scanRecentHistory(depth)` — Quick scan of last N commits (pre-push / quick refresh)
   - `auditFullHistory(fromCheckpoint?)` — Full history walk with incremental checkpointing
   - `huntOrphanBlobs()` — Finds secrets in deleted branches and dangling `.git/objects`
+- **Drizzle Schema** — three-table foundation with referential integrity:
+  - `scans` — activity log with checkpoint resume
+  - `findings` — evidence vault with unique fingerprint, B-tree indexes on severity/rule/path
+  - `secrets_registry` — taint baseline for `.env` key joins
+- **Better-Auth** — offline email/password auth via Drizzle adapter with SQLite
+- **Bootstrap Admin Setup** — `/setup` page gates on empty user table, creates first admin account
 - **Pattern library** — shared rules for GitHub tokens, Stripe keys, AWS keys, private keys, passwords, connection strings, and generic API keys
-- **SQLite via Drizzle** — local-only database, zero external dependencies
+- **SQLite via Drizzle** — WAL mode, foreign keys, local-only database
 - **Type-safe** — full TypeScript with Zod validation and shared types
 - **Pre-commit guard** — Husky + lint-staged hooks
 
@@ -83,7 +89,6 @@ bun lint         # ESLint check
 
 | Phase | Feature | Description |
 |---|---|---|
-| **Phase 2** | Better-Auth | Offline auth setup for dashboard access |
 | **Phase 3** | shadcn/ui Dashboard | Real-time scan progress, findings table, severity chart |
 | **Phase 3** | TanStack Query | Server-side caching and real-time scan state management |
 | **Phase 3** | Demo Attack Simulator | Script to generate a mock vulnerable repo for live demos |
