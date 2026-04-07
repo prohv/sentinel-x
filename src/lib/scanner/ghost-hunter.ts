@@ -54,6 +54,16 @@ const PATTERNS: PatternRule[] = [
   },
 ];
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+//Single regex on clean lines
+const MASTER_PATTERN = new RegExp(
+  PATTERNS.map((p) => p.regex.source).join('|'),
+  'gi',
+);
+
 //Entropy Calculation
 function shannonEntropy(input: string): number {
   if (!input) return 0;
@@ -109,6 +119,10 @@ export async function* ghostHunter(
   rootDir: string = process.cwd(),
 ): AsyncGenerator<GhostFinding, void, unknown> {
   const envKeys = await loadEnvKeys();
+  const taintRegex =
+    envKeys.size > 0
+      ? new RegExp(Array.from(envKeys).map(escapeRegex).join('|'), 'gi')
+      : null;
 
   //async file discovery
   const scanner = new Glob('**/*').scan({ dot: true, cwd: rootDir });
@@ -128,12 +142,19 @@ export async function* ghostHunter(
     const text = await file.text();
     const lines = text.split('\n');
 
-    // + entropy + taint analysis
+    //entropy + taint analysis
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
       const line = lines[lineNum];
 
+      //skip clean lines in one call
+      if (!MASTER_PATTERN.test(line)) continue;
+
+      //single pass taint check
+      const isTainted =
+        taintRegex !== null && taintRegex.test(line) && filePath !== '.env';
+
       for (const rule of PATTERNS) {
-        // Reset regex state
+        //reset regex state
         rule.regex.lastIndex = 0;
         let match: RegExpExecArray | null;
 
@@ -149,13 +170,8 @@ export async function* ghostHunter(
             }
           }
 
-          //Taint check
-          for (const key of envKeys) {
-            if (line.includes(key) && filePath !== '.env') {
-              confidence = 1.0;
-              break;
-            }
-          }
+          //taint check
+          if (isTainted) confidence = 1.0;
 
           //yield structured finding
           yield {
