@@ -1,36 +1,121 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sentinel-X
 
-## Getting Started
+> Local-first secret hunter and taint scanner for codebases. Finds leaked secrets, tracks misconfigurations, and keeps your repo clean — without sending a byte to the cloud.
 
-First, run the development server:
+---
+
+## 🎯 Aim & Scope
+
+Sentinel-X scans your repository for hardcoded secrets, API keys, and configuration leaks. It runs entirely **offline** using local SQLite, so your code never leaves your machine.
+
+Built as a Next.js dashboard with a streaming scanner engine, it's designed for developers who want real-time secret discovery without trusting a third-party SaaS.
+
+---
+
+## 🧱 Tech Stack
+
+| Layer | Tech |
+|---|---|
+| **Runtime** | [Bun](https://bun.sh) |
+| **Framework** | [Next.js 16](https://nextjs.org) (App Router) |
+| **UI** | React 19 + Tailwind CSS 4 |
+| **Data** | Drizzle ORM + SQLite (`bun:sqlite`) |
+| **Auth** | Better-Auth (offline mode) |
+| **State** | TanStack React Query |
+| **Validation** | Zod v4 |
+| **Icons** | Lucide React |
+| **Git Ops** | simple-git |
+| **Hooks** | Husky + lint-staged |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- [Bun](https://bun.sh) installed globally
+- Node.js 20+ (type definitions only)
+
+### Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1. Install dependencies
+bun install
+
+# 2. Copy env template and fill in values
+cp .example.env .env
+
+# 3. (Optional) Push local DB schema
+bunx drizzle-kit push
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+bun dev          # dev server
+bun run build    # production build
+bun start        # production server
+bun lint         # ESLint check
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## ✅ Current Features
 
-To learn more about Next.js, take a look at the following resources:
+- **Ghost Hunter** — async generator (`yield`-based) secret scanner with real-time streaming results
+  - **Master pattern** fast-gate: skips clean lines in 1 regex call instead of N
+  - **Single-pass taint check**: compiled regex replaces the per-key loop (O(n) → O(1))
+  - **Shannon entropy** calculation for unknown-format secret detection
+  - **`.env` taint baseline**: flags when `.env` key names appear in source files
+- **Pattern library** — built-in rules for GitHub tokens, Stripe keys, AWS keys, private keys, passwords, connection strings, and generic API keys
+- **SQLite via Drizzle** — local-only database, zero external dependencies
+- **Type-safe** — full TypeScript with Zod validation and shared types
+- **Pre-commit guard** — Husky + lint-staged hooks
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🔮 Planned Features
 
-## Deploy on Vercel
+| Phase | Feature | Description |
+|---|---|---|
+| **Phase 2** | Git Archaeology | Scan commit history and diffs for secrets in deleted/modified lines via `simple-git` |
+| **Phase 2** | Drizzle Schema | Define tables for findings, scan history, and severity stats |
+| **Phase 2** | Better-Auth | Offline auth setup for dashboard access |
+| **Phase 3** | shadcn/ui Dashboard | Real-time scan progress, findings table, severity chart |
+| **Phase 3** | TanStack Query | Server-side caching and real-time scan state management |
+| **Phase 3** | Demo Attack Simulator | Script to generate a mock vulnerable repo for live demos |
+| **Phase 4** | Entropy Threshold Tuning | Per-rule entropy thresholds with auto-calibration |
+| **Phase 4** | Custom Rule Engine | User-defined regex patterns via UI |
+| **Phase 4** | Export Reports | JSON/PDF/Markdown report generation |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 📁 Project Structure
+
+```
+src/
+├── app/               # Next.js routes & server actions
+├── components/        # shadcn/ui & custom Amethyst components
+├── hooks/             # TanStack Query & scanner hooks
+├── lib/
+│   ├── auth/          # Better-Auth offline configuration
+│   ├── db/            # Drizzle schema & SQLite client
+│   ├── scanner/       # Ghost Hunter engine
+│   └── utils/         # Crypto helpers & regex patterns
+├── scripts/           # Demo repo generator (attack simulator)
+├── types/
+│   └── scanner.ts     # Shared type definitions
+├── drizzle.config.ts  # Drizzle migration settings
+└── .env               # Local-only secrets
+```
+
+---
+
+## 📝 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for all releases and changes.
+
+---
+
+*Built with the mindset: "Your secrets shouldn't leave your machine."*
