@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.3.0] — 2026-04-08
+
+### Added
+- Dashboard UI with 5 polished components:
+  - `Topbar` — repo context, search bar, "New Scan" trigger
+  - `DashboardVitals` — 3 stat cards (threats, score, resolved secrets)
+  - `RulesDistribution` — Recharts donut breakdown by secret type
+  - `FindingsStream` — scrollable findings table with severity badges
+  - `SidebarLog` — scan history timeline + quick actions
+- Chaos Generator attack simulator (`scripts/chaos-generator.sh`):
+  - Seeds `.env.local` with 28+ fake secrets (AWS, Stripe, GitHub, Slack, SendGrid, Twilio, passwords, API keys, connection strings)
+  - Generates 60+ backdated commits with real app boilerplate (React components, lib modules, API routes, tests)
+  - Oops lifecycle: commit → cleanup pattern (secrets persist in git history)
+  - Deep path obfuscation (3-6 levels with hidden dirs)
+  - 4 abandoned feature branches with unmerged leaks
+  - Ground-truth Oracle (`ground_truth.json`) for recall verification
+  - 3 injection modes: env files, inline source, config files
+- Recharts v3.8.1 for charting
+- Google Fonts: Epilogue (headings), Manrope (body), Fira Code (monospace)
+
+---
+
 ## [0.2.0] — 2026-04-07
 
 ### Added

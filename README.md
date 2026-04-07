@@ -62,6 +62,19 @@ bun lint         # ESLint check
 
 ## Current Features
 
+- **Dashboard UI** — polished security scanning dashboard with:
+  - Topbar with repo context, search bar, and scan trigger
+  - Vitals cards (active threats, security score, resolved secrets)
+  - Rules Distribution chart (Recharts donut breakdown by secret type)
+  - Findings Stream table (scrollable feed with severity badges)
+  - Sidebar with scan history timeline and quick actions
+- **Chaos Generator** — standalone attack simulator (`scripts/chaos-generator.sh`) that fabricates a realistic test repo:
+  - 28+ seeded secrets across `.env.local`, inline source, and config files
+  - 60+ backdated commits with real app boilerplate (components, libs, API routes, tests)
+  - Oops lifecycle: commit → cleanup pattern (secrets persist in git history)
+  - Deep path obfuscation (3-6 levels with hidden dirs)
+  - Abandoned feature branches with unmerged leaks
+  - Ground-truth Oracle (`ground_truth.json`) for recall verification
 - **Ghost Hunter** — async generator (`yield`-based) secret scanner with real-time streaming results
   - **Master pattern** fast-gate: skips clean lines in 1 regex call instead of N
   - **Single-pass taint check**: compiled regex replaces the per-key loop (O(n) → O(1))
@@ -89,9 +102,7 @@ bun lint         # ESLint check
 
 | Phase | Feature | Description |
 |---|---|---|
-| **Phase 3** | shadcn/ui Dashboard | Real-time scan progress, findings table, severity chart |
 | **Phase 3** | TanStack Query | Server-side caching and real-time scan state management |
-| **Phase 3** | Demo Attack Simulator | Script to generate a mock vulnerable repo for live demos |
 | **Phase 4** | Entropy Threshold Tuning | Per-rule entropy thresholds with auto-calibration |
 | **Phase 4** | Custom Rule Engine | User-defined regex patterns via UI |
 | **Phase 4** | Export Reports | JSON/PDF/Markdown report generation |
