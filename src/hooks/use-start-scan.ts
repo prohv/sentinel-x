@@ -15,6 +15,7 @@ export function useStartScan() {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['scans'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['findings'] });
       }
     },
   });
