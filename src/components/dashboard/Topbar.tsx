@@ -1,12 +1,19 @@
-import { Shield, Search, PlusCircle } from 'lucide-react';
+import Image from 'next/image';
+import { Search, PlusCircle } from 'lucide-react';
 
 export function Topbar() {
   return (
     <header className="flex items-center justify-between gap-4 w-full">
       {/* Left: Logo + Greeting + Repo */}
       <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center text-white shrink-0">
-          <Shield size={20} />
+        <div className="w-12 h-12 flex items-center justify-center text-white shrink-0 overflow-hidden">
+          <Image
+            src="/sentinel-x-logo.svg"
+            alt="Sentinel-X Logo"
+            width={32}
+            height={32}
+            className="object-contain"
+          />
         </div>
         <div>
           <div className="flex items-center gap-2">
