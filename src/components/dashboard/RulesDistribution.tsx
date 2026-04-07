@@ -1,17 +1,46 @@
-// Placeholder for Rules Distribution Chart
 'use client';
 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { useDashboardStats } from '@/hooks/use-dashboard-stats';
+import { Loader2 } from 'lucide-react';
 
-const chartData = [
-  { name: 'AWS Keys', value: 57, color: '#f43f5e' }, // rose-500
-  { name: 'Private Keys', value: 35, color: '#f59e0b' }, // amber-500
-  { name: 'Stripe Tokens', value: 28, color: '#8b5cf6' }, // violet-500
-  { name: 'Other', value: 22, color: '#e4e4e7' }, // zinc-200
-];
+const RULE_COLORS: Record<string, string> = {
+  'GitHub Token': '#f43f5e',
+  'Stripe Secret Key': '#8b5cf6',
+  'AWS Access Key': '#06b6d4',
+  'Generic API Key': '#f59e0b',
+  'Private Key Block': '#10b981',
+  'Password Assignment': '#ef4444',
+  'Connection String': '#6366f1',
+};
+
+const DEFAULT_COLOR = '#e4e4e7';
 
 export function RulesDistribution() {
-  const total = chartData.reduce((sum, item) => sum + item.value, 0);
+  const { data, isLoading } = useDashboardStats();
+
+  if (isLoading || !data?.success) {
+    return <SkeletonChart />;
+  }
+
+  const { ruleDistribution } = data;
+  const total = ruleDistribution.reduce((sum, r) => sum + Number(r.count), 0);
+
+  if (total === 0) {
+    return (
+      <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm h-full flex flex-col items-center justify-center min-h-[250px]">
+        <p className="text-zinc-400 text-sm font-manrope">
+          No findings yet. Run a scan to see rule distribution.
+        </p>
+      </div>
+    );
+  }
+
+  const chartData = ruleDistribution.map((r) => ({
+    name: r.rule,
+    value: Number(r.count),
+    color: RULE_COLORS[r.rule] ?? DEFAULT_COLOR,
+  }));
 
   return (
     <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm h-full flex flex-col">
@@ -52,35 +81,33 @@ export function RulesDistribution() {
       </div>
 
       <div className="mt-4 space-y-2">
-        <div className="flex items-center justify-between font-manrope text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-rose-500"></div>
-            <span className="text-zinc-700">AWS Keys</span>
-          </div>
-          <span className="font-semibold text-zinc-900">40%</span>
-        </div>
-        <div className="flex items-center justify-between font-manrope text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-amber-500"></div>
-            <span className="text-zinc-700">Private Keys</span>
-          </div>
-          <span className="font-semibold text-zinc-900">25%</span>
-        </div>
-        <div className="flex items-center justify-between font-manrope text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-violet-500"></div>
-            <span className="text-zinc-700">Stripe Tokens</span>
-          </div>
-          <span className="font-semibold text-zinc-900">20%</span>
-        </div>
-        <div className="flex items-center justify-between font-manrope text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-zinc-200"></div>
-            <span className="text-zinc-700">Other</span>
-          </div>
-          <span className="font-semibold text-zinc-900">15%</span>
-        </div>
+        {chartData.map((entry) => {
+          const pct = Math.round((entry.value / total) * 100);
+          return (
+            <div
+              key={entry.name}
+              className="flex items-center justify-between font-manrope text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded"
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="text-zinc-700">{entry.name}</span>
+              </div>
+              <span className="font-semibold text-zinc-900">{pct}%</span>
+            </div>
+          );
+        })}
       </div>
+    </div>
+  );
+}
+
+function SkeletonChart() {
+  return (
+    <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm h-full flex flex-col items-center justify-center min-h-[250px]">
+      <Loader2 className="animate-spin text-zinc-300" size={32} />
     </div>
   );
 }
