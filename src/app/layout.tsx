@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Epilogue, Manrope } from 'next/font/google';
 import { Fira_Code } from 'next/font/google';
+import { ScanProvider } from '@/hooks/scan-provider';
 import './globals.css';
 
 const epilogue = Epilogue({
@@ -38,7 +39,9 @@ export default function RootLayout({
       lang="en"
       className={`h-full antialiased ${epilogue.variable} ${manrope.variable} ${firaCode.variable}`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <ScanProvider>{children}</ScanProvider>
+      </body>
     </html>
   );
 }
