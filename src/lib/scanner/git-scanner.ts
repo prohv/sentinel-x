@@ -48,3 +48,58 @@ function analyzeLine(
 
   return findings;
 }
+
+//Core: find exact commit where a secret appeared/deleted
+export async function traceSecret(
+  repoPath: string,
+  secret: string,
+): Promise<TraceResult> {
+  const git = simpleGit(repoPath);
+  const touched: {
+    commitHash: string;
+    author: string;
+    date: string;
+    file: string;
+  }[] = [];
+
+  try {
+    const pickaxe = await git.raw(
+      'log',
+      '-S',
+      secret,
+      '--format=%H|%an|%aI|%s',
+      '--',
+    );
+
+    for (const entry of pickaxe.split('\n').filter(Boolean)) {
+      const [hash, author, date, subject] = entry.split('|');
+      if (!hash) continue;
+
+      //to find which file changed in this commit
+      const changed = await git.raw(
+        'diff-tree',
+        '--no-commit-id',
+        '--name-only',
+        '-r',
+        hash,
+      );
+      const file = changed.split('\n').filter(Boolean)[0] || '';
+
+      touched.push({
+        commitHash: hash,
+        author: author ?? '',
+        date: date ?? '',
+        file,
+      });
+    }
+  } catch {
+    return { secret, firstSeen: null, lastSeen: null, touchedCommits: [] };
+  }
+
+  return {
+    secret,
+    firstSeen: touched[0] ?? null,
+    lastSeen: touched[touched.length - 1] ?? null,
+    touchedCommits: touched,
+  };
+}

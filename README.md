@@ -4,7 +4,7 @@
 
 ---
 
-## 🎯 Aim & Scope
+## Aim & Scope
 
 Sentinel-X scans your repository for hardcoded secrets, API keys, and configuration leaks. It runs entirely **offline** using local SQLite, so your code never leaves your machine.
 
@@ -12,7 +12,7 @@ Built as a Next.js dashboard with a streaming scanner engine, it's designed for 
 
 ---
 
-## 🧱 Tech Stack
+## Tech Stack
 
 | Layer | Tech |
 |---|---|
@@ -29,7 +29,7 @@ Built as a Next.js dashboard with a streaming scanner engine, it's designed for 
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -60,7 +60,7 @@ bun lint         # ESLint check
 
 ---
 
-## ✅ Current Features
+## Current Features
 
 - **Ghost Hunter** — async generator (`yield`-based) secret scanner with real-time streaming results
   - **Master pattern** fast-gate: skips clean lines in 1 regex call instead of N
@@ -74,7 +74,7 @@ bun lint         # ESLint check
 
 ---
 
-## 🔮 Planned Features
+## Planned Features
 
 | Phase | Feature | Description |
 |---|---|---|
@@ -91,7 +91,7 @@ bun lint         # ESLint check
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 src/
@@ -112,7 +112,7 @@ src/
 
 ---
 
-## 📝 Changelog
+## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for all releases and changes.
 
