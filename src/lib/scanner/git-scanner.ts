@@ -108,9 +108,9 @@ export async function traceSecret(
 
   return {
     secret,
-    firstSeen: touched[0] ?? null,
-    lastSeen: touched[touched.length - 1] ?? null,
-    touchedCommits: touched,
+    firstSeen: touched[touched.length - 1] ?? null,
+    lastSeen: touched[0] ?? null,
+    touchedCommits: [...touched].reverse(),
   };
 }
 
@@ -181,6 +181,10 @@ export async function* auditFullHistory(
     return { totalScanned: 0, checkpoint: null };
   }
 
+  proc.stderr?.on('data', (data: Buffer) => {
+    console.error('[auditFullHistory]', data.toString());
+  });
+
   const decoder = new TextDecoder();
   let buffer = '';
   let currentHash = '';
@@ -189,7 +193,7 @@ export async function* auditFullHistory(
   let lineState: 'idle' | 'hash' | 'author' | 'date' = 'idle';
 
   for await (const chunk of proc.stdout) {
-    buffer += decoder.decode(chunk);
+    buffer += decoder.decode(chunk, { stream: true });
 
     while (true) {
       const nl = buffer.indexOf('\n');
@@ -297,8 +301,12 @@ export async function* huntOrphanBlobs(
   //build hash→filepath map for lookup
   const blobMap = new Map(blobs.map((b) => [b.hash, b.filePath]));
 
+  proc.stderr?.on('data', (data: Buffer) => {
+    console.error('[huntOrphanBlobs]', data.toString());
+  });
+
   for await (const chunk of proc.stdout) {
-    buffer += decoder.decode(chunk);
+    buffer += decoder.decode(chunk, { stream: true });
 
     while (true) {
       if (remainingBytes > 0) {
