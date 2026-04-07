@@ -103,3 +103,41 @@ export async function traceSecret(
     touchedCommits: touched,
   };
 }
+
+//Core: scan last N commits
+export async function scanRecentHistory(
+  repoPath: string,
+  depth: number = COMMIT_DEPTH,
+): Promise<GitCommitFinding[]> {
+  const git = simpleGit(repoPath);
+  const findings: GitCommitFinding[] = [];
+
+  let log;
+  try {
+    log = await git.log({ maxCount: depth });
+  } catch {
+    return [];
+  }
+
+  for (const commit of log.all) {
+    const diff = await git.show([commit.hash, '--unified=0']);
+    const addedLines = diff
+      .split('\n')
+      .filter((line) => line.startsWith('+') && !line.startsWith('+++'));
+
+    for (const line of addedLines) {
+      const lineFindings = analyzeLine(
+        line,
+        commit.hash,
+        commit.author_name || 'unknown',
+        commit.date || '',
+      );
+
+      for (const f of lineFindings) {
+        findings.push({ ...f, path: `git:${commit.hash}` });
+      }
+    }
+  }
+
+  return findings;
+}
