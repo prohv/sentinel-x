@@ -208,3 +208,55 @@ export async function* auditFullHistory(
 
   return { totalScanned, checkpoint };
 }
+
+//Core: dangling blobs from reflog
+export async function* huntOrphanBlobs(
+  repoPath: string,
+): AsyncGenerator<GitCommitFinding, { totalScanned: number }, unknown> {
+  const git = simpleGit(repoPath);
+  let totalScanned = 0;
+
+  let objectsOutput;
+  try {
+    objectsOutput = await git.raw('rev-list', '--objects', '--all', '--reflog');
+  } catch {
+    return { totalScanned: 0 };
+  }
+
+  // extract only blob hashes (lines without a path suffix = commits/trees)
+  const blobLines = objectsOutput
+    .split('\n')
+    .filter((line) => line.trim() && line.includes(' '));
+
+  for (const blobLine of blobLines) {
+    const [hash, ...pathParts] = blobLine.trim().split(' ');
+    const filePath = pathParts.join(' ');
+
+    if (!hash || !filePath) continue;
+
+    let content;
+    try {
+      content = await git.raw('cat-file', '-p', hash);
+    } catch {
+      continue;
+    }
+
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const lineFindings = analyzeLine(
+        lines[i],
+        `orphan:${hash}`,
+        'orphan',
+        '',
+      );
+
+      for (const f of lineFindings) {
+        yield { ...f, path: `orphan:${filePath}` };
+      }
+    }
+
+    totalScanned++;
+  }
+
+  return { totalScanned };
+}
