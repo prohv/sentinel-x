@@ -158,3 +158,16 @@ export async function shieldFinding(id: number) {
     return { success: false, error: 'Failed to shield finding.' };
   }
 }
+
+export async function shieldAllFindings() {
+  try {
+    await db
+      .update(findings)
+      .set({ status: 'shielded' })
+      .where(eq(findings.status, 'open'));
+    return { success: true };
+  } catch (err) {
+    console.error('[shieldAllFindings] Error:', err);
+    return { success: false, error: 'Failed to bulk shield findings.' };
+  }
+}
