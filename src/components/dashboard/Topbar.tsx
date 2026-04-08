@@ -10,12 +10,30 @@ import {
   Shield,
   CheckCircle,
   AlertTriangle,
+  FolderGit,
+  Folder,
+  GitBranch,
 } from 'lucide-react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useStartScan } from '@/hooks/use-start-scan';
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
+import { useScanDirectories } from '@/hooks/use-scan-directories';
 import { shieldAllFindings } from '@/app/actions/get-findings.actions';
 import { useQueryClient } from '@tanstack/react-query';
+
+const REPO_PATH_KEY = 'sentinel-x-repo-path';
+
+function getCurrentRepoPath(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(REPO_PATH_KEY) || '';
+}
+
+function extractRepoName(repoPath: string): string {
+  if (!repoPath) return 'No repository selected';
+  // Extract last folder name from path
+  const parts = repoPath.replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts[parts.length - 1] || repoPath;
+}
 
 type ScanType = 'ghost_hunter' | 'git_recent' | 'git_full' | 'git_orphan';
 
@@ -29,6 +47,29 @@ export function Topbar() {
   const queryClient = useQueryClient();
   const [isShieldingAll, setIsShieldingAll] = useState(false);
   const [showShieldAllSuccess, setShowShieldAllSuccess] = useState(false);
+  const [currentRepoPath, setCurrentRepoPath] = useState(() =>
+    getCurrentRepoPath(),
+  );
+
+  // Listen for repo path changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setCurrentRepoPath(getCurrentRepoPath());
+    };
+    window.addEventListener('storage', handleStorageChange);
+    // Poll for changes within same window
+    const interval = setInterval(() => {
+      const latest = getCurrentRepoPath();
+      if (latest !== currentRepoPath) {
+        setCurrentRepoPath(latest);
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [currentRepoPath]);
 
   const handleShieldAll = async () => {
     setIsShieldingAll(true);
@@ -80,10 +121,11 @@ export function Topbar() {
                 Admin
               </span>
             </div>
-            <p className="font-manrope text-xs text-zinc-500 mt-0.5">
+            <p className="font-manrope text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
+              <FolderGit size={10} />
               Repository:{' '}
               <span className="font-mono text-zinc-800 font-medium">
-                sentinel-x/core
+                {extractRepoName(currentRepoPath)}
               </span>
             </p>
           </div>
@@ -141,12 +183,11 @@ export function Topbar() {
                 <CheckCircle className="text-emerald-500" size={32} />
               </div>
               <h2 className="font-epilogue font-bold text-xl text-zinc-900 mb-2 text-center">
-                Global Defenses Active!
+                Global Shield Applied!
               </h2>
-              <p className="text-sm text-zinc-500 text-center font-manrope leading-relaxed mb-6">
-                All outstanding artifact traces have been systematically
-                verified, encrypted, and structurally isolated in the secure
-                Vault registry in bulk.
+              <p className="text-md text-zinc-500 text-center font-manrope leading-relaxed mb-6">
+                All outstanding artifact traces have been encrypted and isolated
+                in the secure Vault registry in bulk.
               </p>
 
               <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-left flex items-start gap-3">
@@ -158,7 +199,7 @@ export function Topbar() {
                   <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-700 mb-1">
                     Next Steps
                   </h4>
-                  <p className="text-xs font-medium text-amber-700/80 leading-relaxed">
+                  <p className="text-sm font-medium text-amber-700/80 leading-relaxed">
                     Be sure to rotate these keys at the provider level soon to
                     fully secure the repo.
                   </p>
@@ -175,13 +216,16 @@ export function Topbar() {
 }
 
 function ScanDialog({ onClose }: { onClose: () => void }) {
-  const [repoPath, setRepoPath] = useState('../sentinel-chaos-demo/chaos-repo');
+  const lastRepoPath = getCurrentRepoPath();
+  const [repoPath, setRepoPath] = useState(lastRepoPath || '.');
   const [scanType, setScanType] = useState<ScanType>('ghost_hunter');
   const startScan = useStartScan();
 
   async function handleStart() {
     const result = await startScan.mutateAsync({ repoPath, scanType });
     if (result.success) {
+      // Save to localStorage so it persists across scans
+      localStorage.setItem(REPO_PATH_KEY, repoPath);
       onClose();
     }
   }
