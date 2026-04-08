@@ -64,7 +64,7 @@ export function Topbar() {
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 flex items-center justify-center text-white shrink-0 overflow-hidden">
             <Image
-              src="/sentinel-x-logo.svg"
+              src="/logo.svg"
               alt="Sentinel-X Logo"
               width={32}
               height={32}
