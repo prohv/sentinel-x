@@ -2,13 +2,13 @@
 
 import {
   Settings,
-  DownloadCloud,
+  FileBarChart2,
   Activity,
   Clock,
   Loader2,
 } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
-import { exportFindingsCSV } from '@/app/actions/get-findings.actions';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 const statusStyle: Record<
@@ -31,36 +31,14 @@ const statusStyle: Record<
 
 export function SidebarLog() {
   const { data, isLoading } = useDashboardStats();
-  const [isExporting, setIsExporting] = useState(false);
+  const router = useRouter();
+  const [isNavigating, setIsNavigating] = useState(false);
   const scans = data?.success ? data.scanHistory : [];
   const hasActiveScan = scans.some((s) => s.status === 'running');
 
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      const result = await exportFindingsCSV();
-      if (result.success) {
-        const blob = new Blob([result.csv], {
-          type: 'text/csv;charset=utf-8;',
-        });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute(
-          'download',
-          `sentinel-x-report-${new Date().toISOString().split('T')[0]}.csv`,
-        );
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        alert(result.error);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('An error occurred during export.');
-    } finally {
-      setIsExporting(false);
-    }
+  const handleReportClick = () => {
+    setIsNavigating(true);
+    router.push('/dashboard/report');
   };
 
   return (
@@ -139,20 +117,25 @@ export function SidebarLog() {
         </h2>
         <div className="flex flex-col gap-3">
           <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleReportClick}
+            disabled={isNavigating}
+            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-violet-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm group hover:border-violet-200 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-600">
-              {isExporting ? (
-                <Loader2 size={16} className="animate-spin" />
+            <div className="w-8 h-8 rounded-lg bg-zinc-100 group-hover:bg-violet-100 flex items-center justify-center text-zinc-600 group-hover:text-violet-600 transition-colors">
+              {isNavigating ? (
+                <Loader2 size={16} className="animate-spin text-violet-600" />
               ) : (
-                <DownloadCloud size={16} />
+                <FileBarChart2 size={16} />
               )}
             </div>
-            <span className="font-medium">
-              {isExporting ? 'Generating...' : 'Export CSV Report'}
-            </span>
+            <div>
+              <span className="font-semibold block text-zinc-900">
+                {isNavigating ? 'Generating...' : 'Export Report'}
+              </span>
+              <span className="text-[11px] text-zinc-400">
+                Management-ready briefing
+              </span>
+            </div>
           </button>
 
           <button className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm">
