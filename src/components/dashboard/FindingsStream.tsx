@@ -46,7 +46,7 @@ export function FindingsStream() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['findings'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   };
 
   if (isLoading || !data?.success) {

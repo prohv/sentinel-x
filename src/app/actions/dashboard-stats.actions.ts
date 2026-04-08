@@ -19,9 +19,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
       db
         .select({ count: count() })
         .from(findings)
-        .where(
-          sql`(${findings.severity} = 'critical' OR ${findings.severity} = 'high') AND ${findings.status} = 'open'`,
-        ),
+        .where(sql`${findings.status} = 'open'`),
 
       db
         .select({ count: count() })
@@ -33,6 +31,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
       db
         .select({ rule: findings.rule, count: count() })
         .from(findings)
+        .where(sql`${findings.status} = 'open'`)
         .groupBy(findings.rule)
         .orderBy(asc(findings.rule)),
 
