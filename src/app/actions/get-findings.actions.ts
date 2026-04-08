@@ -54,3 +54,72 @@ export async function getFindings(input: unknown): Promise<FindingsResult> {
     return { success: false, error: 'Failed to fetch findings.' };
   }
 }
+
+export async function exportFindingsCSV(): Promise<
+  { success: true; csv: string } | { success: false; error: string }
+> {
+  try {
+    const allFindings = await db
+      .select({
+        id: findings.id,
+        rule: findings.rule,
+        severity: findings.severity,
+        path: findings.path,
+        line: findings.line,
+        status: findings.status,
+        confidence: findings.confidence,
+        author: findings.author,
+        commitHash: findings.commitHash,
+      })
+      .from(findings)
+      .orderBy(desc(findings.id));
+
+    if (allFindings.length === 0) {
+      return { success: false, error: 'No findings to export.' };
+    }
+
+    const headers = [
+      'ID',
+      'Rule',
+      'Severity',
+      'Path',
+      'Line',
+      'Status',
+      'Confidence',
+      'Author',
+      'Commit Hash',
+    ];
+
+    // Convert to sanitized CSV string
+    const escapeCSV = (val: unknown) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val);
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const csvLines = [headers.map(escapeCSV).join(',')];
+
+    for (const f of allFindings) {
+      const row = [
+        f.id,
+        f.rule,
+        f.severity,
+        f.path,
+        f.line,
+        f.status,
+        `${f.confidence}%`,
+        f.author || 'system',
+        f.commitHash || 'N/A',
+      ];
+      csvLines.push(row.map(escapeCSV).join(','));
+    }
+
+    return { success: true, csv: csvLines.join('\n') };
+  } catch (err) {
+    console.error('[exportFindingsCSV] Error:', err);
+    return { success: false, error: 'Failed to generate CSV export.' };
+  }
+}

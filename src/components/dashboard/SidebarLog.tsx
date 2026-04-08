@@ -8,6 +8,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
+import { exportFindingsCSV } from '@/app/actions/get-findings.actions';
+import { useState } from 'react';
 
 const statusStyle: Record<
   string,
@@ -29,8 +31,37 @@ const statusStyle: Record<
 
 export function SidebarLog() {
   const { data, isLoading } = useDashboardStats();
+  const [isExporting, setIsExporting] = useState(false);
   const scans = data?.success ? data.scanHistory : [];
   const hasActiveScan = scans.some((s) => s.status === 'running');
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const result = await exportFindingsCSV();
+      if (result.success) {
+        const blob = new Blob([result.csv], {
+          type: 'text/csv;charset=utf-8;',
+        });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute(
+          'download',
+          `sentinel-x-report-${new Date().toISOString().split('T')[0]}.csv`,
+        );
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert(result.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('An error occurred during export.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-zinc-50/50">
@@ -107,11 +138,21 @@ export function SidebarLog() {
           Quick Actions
         </h2>
         <div className="flex flex-col gap-3">
-          <button className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm">
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-600">
-              <DownloadCloud size={16} />
+              {isExporting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <DownloadCloud size={16} />
+              )}
             </div>
-            <span className="font-medium">Export CSV Report</span>
+            <span className="font-medium">
+              {isExporting ? 'Generating...' : 'Export CSV Report'}
+            </span>
           </button>
 
           <button className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm">
