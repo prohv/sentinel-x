@@ -9,8 +9,10 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
   try {
     const [
       threatResult,
+      shieldedResult,
       totalResult,
       ruleDistResult,
+      severityDistResult,
       recentResult,
       scanHistoryResult,
     ] = await Promise.all([
@@ -18,8 +20,13 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
         .select({ count: count() })
         .from(findings)
         .where(
-          sql`${findings.severity} = 'critical' OR ${findings.severity} = 'high'`,
+          sql`(${findings.severity} = 'critical' OR ${findings.severity} = 'high') AND ${findings.status} = 'open'`,
         ),
+
+      db
+        .select({ count: count() })
+        .from(findings)
+        .where(sql`${findings.status} = 'shielded'`),
 
       db.select({ count: count() }).from(findings),
 
@@ -28,6 +35,12 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
         .from(findings)
         .groupBy(findings.rule)
         .orderBy(asc(findings.rule)),
+
+      db
+        .select({ severity: findings.severity, count: count() })
+        .from(findings)
+        .where(sql`${findings.status} = 'open'`)
+        .groupBy(findings.severity),
 
       db
         .select({
@@ -39,6 +52,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
           line: findings.line,
           confidence: findings.confidence,
           snippet: findings.snippet,
+          status: findings.status,
           commitHash: findings.commitHash,
           author: findings.author,
         })
@@ -61,18 +75,31 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
         .limit(10),
     ]);
 
-    const totalFindings = totalResult?.count ?? 0;
-    const activeThreats = threatResult?.count ?? 0;
+    const totalFindings = Number(totalResult[0]?.count ?? 0);
+    const activeThreats = Number(threatResult[0]?.count ?? 0);
+    const shieldedSecrets = Number(shieldedResult[0]?.count ?? 0);
+
+    // Calculate dynamic security score based on severity weights
+    let penalty = 0;
+    for (const row of severityDistResult) {
+      const c = Number(row.count);
+      if (row.severity === 'critical') penalty += c * 10;
+      else if (row.severity === 'high') penalty += c * 5;
+      else if (row.severity === 'medium') penalty += c * 2;
+      else if (row.severity === 'low') penalty += c * 1;
+    }
+
+    // Exponential decay curve: steeper decay to lower the score faster.
     const securityScore =
-      totalFindings > 0
-        ? Math.round(((totalFindings - activeThreats) / totalFindings) * 100)
-        : 100;
+      totalFindings === 0
+        ? 100
+        : Math.max(1, Math.round(100 * Math.exp(-penalty / 350)));
 
     return {
       success: true,
       activeThreats,
       securityScore,
-      shieldedSecrets: totalFindings,
+      shieldedSecrets,
       ruleDistribution: ruleDistResult,
       recentFindings: recentResult,
       scanHistory: scanHistoryResult,

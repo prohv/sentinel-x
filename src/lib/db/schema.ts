@@ -26,6 +26,7 @@ export const findings = sqliteTable(
     confidence: integer('confidence').notNull().default(0), // 0-100 stored as int
     snippet: text('snippet').notNull(),
     fingerprint: text('fingerprint').unique(), // hash(path + secret)
+    status: text('status').notNull().default('open'), // 'open' | 'shielded'
     commitHash: text('commit_hash'), // null for file scans
     author: text('author'),
   },

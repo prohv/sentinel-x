@@ -9,7 +9,7 @@ import { FindingsQuerySchema } from './scan-types';
 export async function getFindings(input: unknown): Promise<FindingsResult> {
   const parsed = FindingsQuerySchema.safeParse(input);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message };
+    return { success: false, error: parsed.error.issues[0].message };
   }
 
   const { scanId, severity, limit, offset } = parsed.data;
@@ -32,6 +32,7 @@ export async function getFindings(input: unknown): Promise<FindingsResult> {
           line: findings.line,
           confidence: findings.confidence,
           snippet: findings.snippet,
+          status: findings.status,
           commitHash: findings.commitHash,
           author: findings.author,
         })

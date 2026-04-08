@@ -18,6 +18,7 @@ export type FindingRow = {
   line: number;
   confidence: number;
   snippet: string;
+  status: string;
   commitHash: string | null;
   author: string | null;
 };
