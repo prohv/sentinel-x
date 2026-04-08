@@ -90,14 +90,14 @@ function TopbarInner() {
     <>
       <header className="flex items-center justify-between gap-4 w-full">
         {/* Left: Logo + Greeting + Repo */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="w-12 h-12 flex items-center justify-center text-white shrink-0 overflow-hidden">
             <Link href="/">
               <Image
                 src="/logo.svg"
                 alt="Sentinel-X Logo"
-                width={32}
-                height={32}
+                width={36}
+                height={36}
                 className="object-contain"
               />
             </Link>
@@ -105,7 +105,7 @@ function TopbarInner() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-epilogue font-bold text-lg text-zinc-900 leading-tight">
-                shado
+                Sentinel X
               </h1>
               <span className="bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
                 Admin
