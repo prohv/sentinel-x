@@ -2,6 +2,7 @@
 
 import { useFindings } from '@/hooks/use-findings';
 import { Loader2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 const severityColor: Record<string, { text: string; dot: string }> = {
   critical: { text: 'text-rose-600', dot: 'bg-rose-500' },
@@ -18,7 +19,10 @@ const SEVERITY_CAPITALIZED: Record<string, string> = {
 };
 
 export function FindingsStream() {
-  const { data, isLoading } = useFindings({ limit: 12 });
+  const searchParams = useSearchParams();
+  const q = searchParams.get('q') || undefined;
+
+  const { data, isLoading } = useFindings({ limit: 12, searchQuery: q });
 
   if (isLoading || !data?.success) {
     return <SkeletonStream />;

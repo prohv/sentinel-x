@@ -1,14 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Search, PlusCircle, Loader2, X } from 'lucide-react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useStartScan } from '@/hooks/use-start-scan';
 
 type ScanType = 'ghost_hunter' | 'git_recent' | 'git_full' | 'git_orphan';
 
 export function Topbar() {
   const [showDialog, setShowDialog] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (searchTerm) {
+        params.set('q', searchTerm);
+      } else {
+        params.delete('q');
+      }
+      router.replace(`${pathname}?${params.toString()}`);
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, pathname, router, searchParams]);
 
   return (
     <>
@@ -51,6 +70,8 @@ export function Topbar() {
             />
             <input
               type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search specific Rule IDs or File Paths..."
               className="w-full bg-white border border-zinc-200 rounded-lg pl-9 pr-4 py-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-manrope placeholder:text-zinc-400"
             />
@@ -66,9 +87,6 @@ export function Topbar() {
             <PlusCircle size={16} />
             <span className="hidden sm:inline">New Scan</span>
           </button>
-          <div className="w-10 h-10 rounded-full bg-zinc-200 border border-zinc-300 overflow-hidden shrink-0 flex items-center justify-center text-zinc-600 font-bold text-sm">
-            SH
-          </div>
         </div>
       </header>
 

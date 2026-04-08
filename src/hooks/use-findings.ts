@@ -5,6 +5,7 @@ import type { FindingsResult } from '@/app/actions/scan-types';
 type FindingsFilters = {
   scanId?: number;
   severity?: string;
+  searchQuery?: string;
   limit?: number;
   offset?: number;
 };

@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { findings } from '@/lib/db/schema';
-import { eq, desc, count, and } from 'drizzle-orm';
+import { eq, desc, count, and, like, or } from 'drizzle-orm';
 import type { FindingsResult } from './scan-types';
 import { FindingsQuerySchema } from './scan-types';
 
@@ -12,12 +12,20 @@ export async function getFindings(input: unknown): Promise<FindingsResult> {
     return { success: false, error: parsed.error.issues[0].message };
   }
 
-  const { scanId, severity, limit, offset } = parsed.data;
+  const { scanId, severity, limit, offset, searchQuery } = parsed.data;
 
   try {
     const conditions = [];
     if (scanId !== undefined) conditions.push(eq(findings.scanId, scanId));
     if (severity) conditions.push(eq(findings.severity, severity));
+    if (searchQuery) {
+      conditions.push(
+        or(
+          like(findings.rule, `%${searchQuery}%`),
+          like(findings.path, `%${searchQuery}%`),
+        ),
+      );
+    }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
