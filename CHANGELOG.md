@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.2.0-beta] — 2026-04-09
+
+### Added
+- **Landing Page & Public Site:**
+  - Polished hero section with visual graphics
+  - Feature highlights strip showcasing core capabilities
+  - Responsive navigation bar with routing
+  - Landing footer with project information
+- **Documentation System:**
+  - `/docs` route — built-in documentation viewer
+  - `/changelog` route — interactive release history display
+  - `/api/changelog` — API endpoint for changelog data
+  - `/api/readme` — API endpoint for README content
+  - Markdown rendering via `marked` v18 integration
+- **Server Action Architecture:**
+  - `start-scan.actions.ts` — scan trigger handler
+  - `scan-status.actions.ts` — scan status polling
+  - `scan-directories.actions.ts` — directory scanning logic
+  - `get-findings.actions.ts` — findings retrieval
+  - `dashboard-stats.actions.ts` — metrics aggregation
+  - `scan-types.ts` — shared type definitions
+- **TanStack Query Hooks:**
+  - `use-start-scan` — initiate scans with reactive state
+  - `use-scan-status` — real-time status polling
+  - `use-findings` — automated findings fetching
+  - `use-dashboard-stats` — live dashboard metrics
+  - `use-scan-directories` — directory selection state
+  - `scan-provider.tsx` — unified React context for scan state
+- **Developer Utilities:**
+  - `scripts/reset-db.ts` — TypeScript database reset utility
+  - Enhanced `db:reset` package.json script
+
+### Changed
+- Restructured `src/lib/utils/` → `src/lib/vault/` for clearer security context
+- Organized features into categorized sections (Landing, Dashboard, Scanners, Auth, DX)
+- Expanded Tech Stack table with Markdown, Charts, and Fonts entries
+- Updated project structure diagram to reflect actual file layout
+
+### Dependencies
+- Added `marked` v18.0.0 for Markdown parsing/rendering
+
+---
+
 ## [1.1.0-beta] — 2026-04-08
 
 ### Added

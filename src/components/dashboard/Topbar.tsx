@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Search,
   PlusCircle,
@@ -119,13 +120,15 @@ function TopbarInner() {
         {/* Left: Logo + Greeting + Repo */}
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 flex items-center justify-center text-white shrink-0 overflow-hidden">
-            <Image
-              src="/logo.svg"
-              alt="Sentinel-X Logo"
-              width={32}
-              height={32}
-              className="object-contain"
-            />
+            <Link href="/">
+              <Image
+                src="/logo.svg"
+                alt="Sentinel-X Logo"
+                width={32}
+                height={32}
+                className="object-contain"
+              />
+            </Link>
           </div>
           <div>
             <div className="flex items-center gap-2">

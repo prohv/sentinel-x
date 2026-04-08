@@ -23,8 +23,11 @@ Built as a Next.js dashboard with a streaming scanner engine, it's designed for 
 | **Auth** | Better-Auth (offline mode) |
 | **State** | TanStack React Query |
 | **Validation** | Zod v4 |
+| **Markdown** | Marked v18 |
 | **Icons** | Lucide React |
+| **Charts** | Recharts v3 |
 | **Git Ops** | simple-git |
+| **Fonts** | Epilogue, Manrope, Fira Code (Google Fonts) |
 | **Hooks** | Husky + lint-staged |
 
 ---
@@ -63,6 +66,12 @@ bun run db:reset # nuke and recreate current db
 
 ## Current Features
 
+### Landing Page
+- **Polished public-facing site** with hero section, feature highlights, and navigation
+- **Docs & Changelog pages** — built-in documentation viewer and release history
+- **Responsive design** — mobile-first layout with smooth transitions
+
+### Scanner Dashboard
 - **Dashboard UI** — polished security scanning dashboard with:
   - Topbar with repo context, search bar, and mass "Shield All" trigger
   - Vitals cards (active threats, security score, resolved secrets)
@@ -79,6 +88,8 @@ bun run db:reset # nuke and recreate current db
 - **Bulk Defenses** — "Shield All" global interaction to secure an entire codebase in one click
 - **Real-time Synchronization** — Unified dashboard metrics with automatic TanStack cache invalidation
 - **Compliance Reporting** — Instant CSV export utility for all discovered and processed findings
+
+### Scanner Engines
 - **Chaos Generator** — standalone attack simulator (`scripts/chaos-generator.sh`) that fabricates a realistic test repo:
   - 28+ seeded secrets across `.env.local`, inline source, and config files
   - 60+ backdated commits with real app boilerplate (components, libs, API routes, tests)
@@ -96,16 +107,17 @@ bun run db:reset # nuke and recreate current db
   - `scanRecentHistory(depth)` — Quick scan of last N commits (pre-push / quick refresh)
   - `auditFullHistory(fromCheckpoint?)` — Full history walk with incremental checkpointing
   - `huntOrphanBlobs()` — Finds secrets in deleted branches and dangling `.git/objects`
-- **Drizzle Schema** — three-table foundation with referential integrity:
-  - `scans` — activity log with checkpoint resume
-  - `findings` — evidence vault with unique fingerprint, B-tree indexes on severity/rule/path
-  - `secrets_registry` — taint baseline for `.env` key joins
+
+### Auth & Security
 - **Better-Auth** — offline email/password auth via Drizzle adapter with SQLite
 - **Bootstrap Admin Setup** — `/setup` page gates on empty user table, creates first admin account
 - **Pattern library** — shared rules for GitHub tokens, Stripe keys, AWS keys, private keys, passwords, connection strings, and generic API keys
 - **SQLite via Drizzle** — WAL mode, foreign keys, local-only database
+
+### Developer Experience
 - **Type-safe** — full TypeScript with Zod validation and shared types
 - **Pre-commit guard** — Husky + lint-staged hooks
+- **Database utilities** — `db:reset` script and `scripts/reset-db.ts` for rapid re-initialization
 
 ---
 
@@ -116,6 +128,8 @@ bun run db:reset # nuke and recreate current db
 | **Phase 4** | Entropy Threshold Tuning | Per-rule entropy thresholds with auto-calibration |
 | **Phase 4** | Custom Rule Engine | User-defined regex patterns via UI |
 | **Phase 5** | PDF Generation | Formal PDF security audit reports |
+| **Phase 5** | CI/CD Integration | GitHub Actions & GitLab CI pipeline scanning |
+| **Phase 6** | Multi-Repo Support | Scan multiple repositories from single dashboard |
 
 
 ---
@@ -124,22 +138,70 @@ bun run db:reset # nuke and recreate current db
 
 ```
 src/
-├── app/               # Next.js routes & server actions
-├── components/        # shadcn/ui & custom Amethyst components
-├── hooks/             # TanStack Query & scanner hooks
+├── app/                           # Next.js routes & server actions
+│   ├── actions/                   # Server action handlers
+│   │   ├── start-scan.actions.ts  # Trigger new scans
+│   │   ├── scan-status.actions.ts # Poll scan status
+│   │   ├── scan-directories.actions.ts # Directory scanning
+│   │   ├── get-findings.actions.ts# Fetch findings
+│   │   ├── dashboard-stats.actions.ts # Dashboard metrics
+│   │   └── scan-types.ts          # Shared scan type definitions
+│   ├── api/                       # API routes
+│   │   └── auth/[...all]/         # Better-Auth catch-all handler
+│   ├── dashboard/                 # Scanner dashboard page
+│   ├── docs/                      # Documentation viewer
+│   ├── changelog/                 # Changelog display page
+│   ├── setup/                     # Bootstrap admin setup
+│   │   ├── SetupForm.tsx          # Setup form component
+│   │   └── setup.actions.ts       # Setup server action
+│   ├── page.tsx                   # Landing page
+│   ├── layout.tsx                 # Root layout
+│   └── globals.css                # Global styles
+│
+├── components/                    # UI components
+│   ├── dashboard/                 # Dashboard-specific components
+│   │   ├── Topbar.tsx             # Repo context, search, Shield All
+│   │   ├── DashboardVitals.tsx    # Stat cards
+│   │   ├── RulesDistribution.tsx  # Recharts donut chart
+│   │   ├── FindingsStream.tsx     # Findings table
+│   │   └── SidebarLog.tsx         # Scan history sidebar
+│   └── landing/                   # Landing page components
+│       ├── HeroSection.tsx        # Hero area
+│       ├── HeroVisual.tsx         # Hero visual element
+│       ├── LandingNav.tsx         # Navigation bar
+│       ├── FeaturesStrip.tsx      # Feature highlights
+│       └── LandingFooter.tsx      # Page footer
+│
+├── hooks/                         # TanStack Query & scanner hooks
+│   ├── scan-provider.tsx          # React context for scan state
+│   ├── use-start-scan.ts          # Start scan hook
+│   ├── use-scan-status.ts         # Scan status polling hook
+│   ├── use-findings.ts            # Fetch findings hook
+│   ├── use-dashboard-stats.ts     # Dashboard metrics hook
+│   └── use-scan-directories.ts    # Directory scanning hook
+│
 ├── lib/
-│   ├── auth/          # Better-Auth offline configuration
-│   ├── db/            # Drizzle schema & SQLite client
-│   ├── scanner/       # Ghost Hunter + Git Scanner engines
-│   │   ├── ghost-hunter.ts   # Filesystem secret scanner
-│   │   ├── git-scanner.ts    # Git history scanner
-│   │   └── patterns.ts       # Shared pattern rules
-│   └── utils/         # Crypto helpers & regex patterns
-├── scripts/           # Demo repo generator (attack simulator)
+│   ├── auth/                      # Better-Auth offline configuration
+│   │   └── index.ts               # Auth config & Drizzle adapter
+│   ├── db/                        # Drizzle schema & SQLite client
+│   │   ├── index.ts               # DB connection (WAL mode, FK)
+│   │   └── schema.ts              # Schema: scans, findings, secrets_registry
+│   ├── scanner/                   # Scanner engines
+│   │   ├── ghost-hunter.ts        # Filesystem secret scanner
+│   │   ├── git-scanner.ts         # Git history scanner
+│   │   └── patterns.ts            # Shared pattern rules (7 types)
+│   └── vault/                     # Secure Vault Engine
+│       └── crypto.ts              # AES-256-GCM encryption utilities
+│
 ├── types/
-│   └── scanner.ts     # Shared type definitions
-├── drizzle.config.ts  # Drizzle migration settings
-└── .env               # Local-only secrets
+│   └── scanner.ts                 # Shared type definitions
+│
+├── scripts/                       # Utility scripts
+│   ├── chaos-generator.sh         # Attack simulator (test repo generator)
+│   └── reset-db.ts                # Database reset utility
+│
+├── drizzle.config.ts              # Drizzle migration settings
+└── .env                           # Local-only configuration
 ```
 
 ---
