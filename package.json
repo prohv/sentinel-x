@@ -7,7 +7,8 @@
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "lint": "eslint",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "db:reset": "rm -f sentinel.db sentinel.db-* && bun x drizzle-kit push"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",
