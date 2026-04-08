@@ -42,6 +42,21 @@ export const secretsRegistry = sqliteTable('secrets_registry', {
   keyName: text('key_name').notNull().unique(), // env key name e.g. DATABASE_URL
 });
 
+export const purgeLog = sqliteTable('purge_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  findingId: integer('finding_id').references(() => findings.id, {
+    onDelete: 'set null',
+  }),
+  repoPath: text('repo_path').notNull(),
+  affectedPath: text('affected_path').notNull(), // relative file path — never the secret
+  ruleMatched: text('rule_matched').notNull(), // e.g. "Stripe Secret Key"
+  status: text('status').notNull().default('running'), // 'running' | 'success' | 'failed'
+  pristine: integer('pristine').notNull().default(0), // 1 = mini-scan confirmed clean
+  errorMessage: text('error_message'),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+});
+
 //Relations
 export const scansRelations = relations(scans, ({ many }) => ({
   findings: many(findings),
