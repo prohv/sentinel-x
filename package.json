@@ -1,13 +1,14 @@
 {
   "name": "sentinel-x",
-  "version": "0.1.0",
+  "version": "1.1.0-beta",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "bun --bun next dev",
+    "build": "bun --bun next build",
+    "start": "bun --bun next start",
     "lint": "eslint",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "db:reset": "rm -f sentinel.db sentinel.db-* && bun x drizzle-kit push"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",

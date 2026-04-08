@@ -45,8 +45,8 @@ bun install
 # 2. Copy env template and fill in values
 cp .example.env .env
 
-# 3. (Optional) Push local DB schema
-bunx drizzle-kit push
+# 3. (Optional) Initialize DB schema or Reset for Demo
+bun run db:reset
 ```
 
 ### Run
@@ -56,6 +56,7 @@ bun dev          # dev server
 bun run build    # production build
 bun start        # production server
 bun lint         # ESLint check
+bun run db:reset # nuke and recreate current db
 ```
 
 ---
@@ -63,11 +64,21 @@ bun lint         # ESLint check
 ## Current Features
 
 - **Dashboard UI** — polished security scanning dashboard with:
-  - Topbar with repo context, search bar, and scan trigger
+  - Topbar with repo context, search bar, and mass "Shield All" trigger
   - Vitals cards (active threats, security score, resolved secrets)
   - Rules Distribution chart (Recharts donut breakdown by secret type)
   - Findings Stream table (scrollable feed with severity badges)
   - Sidebar with scan history timeline and quick actions
+- **Remediation Hub** — Intelligent Detail Dialog featuring:
+  - Exact file path resolution (VCS vs Ghost vs Phantom)
+  - Commit author/hash context with live code snippet evidence
+  - Interactive False Positive and Shielding workflows
+- **Secure Vault Engine** — Industry-standard structural isolation:
+  - **AES-256-GCM** authenticated encryption for shielded artifacts
+  - Cryptographic decoupling from the local repository state
+- **Bulk Defenses** — "Shield All" global interaction to secure an entire codebase in one click
+- **Real-time Synchronization** — Unified dashboard metrics with automatic TanStack cache invalidation
+- **Compliance Reporting** — Instant CSV export utility for all discovered and processed findings
 - **Chaos Generator** — standalone attack simulator (`scripts/chaos-generator.sh`) that fabricates a realistic test repo:
   - 28+ seeded secrets across `.env.local`, inline source, and config files
   - 60+ backdated commits with real app boilerplate (components, libs, API routes, tests)
@@ -102,10 +113,9 @@ bun lint         # ESLint check
 
 | Phase | Feature | Description |
 |---|---|---|
-| **Phase 3** | TanStack Query | Server-side caching and real-time scan state management |
 | **Phase 4** | Entropy Threshold Tuning | Per-rule entropy thresholds with auto-calibration |
 | **Phase 4** | Custom Rule Engine | User-defined regex patterns via UI |
-| **Phase 4** | Export Reports | JSON/PDF/Markdown report generation |
+| **Phase 5** | PDF Generation | Formal PDF security audit reports |
 
 
 ---
