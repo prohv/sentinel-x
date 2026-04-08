@@ -44,19 +44,21 @@ export function SidebarLog() {
   return (
     <div className="flex flex-col h-full bg-zinc-50/50">
       {/* Scan History */}
-      <div className="flex-1 px-6 pt-8 pb-6">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="font-epilogue font-semibold text-lg text-zinc-900 flex items-center gap-2">
-            <Activity size={20} className="text-violet-600" />
-            The Sentinel Log
-          </h2>
-          {hasActiveScan && (
-            <span className="text-xs font-manrope font-medium text-violet-600 bg-violet-100 px-2 py-1 rounded-full">
-              Live Monitor
-            </span>
-          )}
-        </div>
+      {/* Heading — pinned, never scrolls */}
+      <div className="shrink-0 px-6 pt-8 pb-4 flex items-center justify-between">
+        <h2 className="font-epilogue font-semibold text-lg text-zinc-900 flex items-center gap-2">
+          <Activity size={20} className="text-violet-600" />
+          The Sentinel Log
+        </h2>
+        {hasActiveScan && (
+          <span className="text-xs font-manrope font-medium text-violet-600 bg-violet-100 px-2 py-1 rounded-full">
+            Live Monitor
+          </span>
+        )}
+      </div>
 
+      {/* Log list — scrolls independently */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="animate-spin text-zinc-300" size={24} />
@@ -66,7 +68,7 @@ export function SidebarLog() {
             No scans yet. Hit &quot;New Scan&quot; to get started.
           </p>
         ) : (
-          <div className="relative mt-6">
+          <div className="relative mt-2">
             <div className="absolute top-2 bottom-0 left-[11px] w-0.5 bg-zinc-200 z-0" />
 
             <div className="space-y-10 relative z-10">
