@@ -1,7 +1,7 @@
 'use server';
 
 import { readdir, stat } from 'fs/promises';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 export type DirEntry = {
   name: string;
@@ -10,7 +10,7 @@ export type DirEntry = {
 };
 
 export async function scanDirectories(
-  rootPath: string = process.cwd(),
+  rootPath: string = resolve(process.cwd(), '..'),
 ): Promise<
   { success: true; dirs: DirEntry[] } | { success: false; error: string }
 > {

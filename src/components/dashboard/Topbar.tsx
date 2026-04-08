@@ -122,7 +122,6 @@ export function Topbar() {
               </span>
             </div>
             <p className="font-manrope text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
-              <FolderGit size={10} />
               Repository:{' '}
               <span className="font-mono text-zinc-800 font-medium">
                 {extractRepoName(currentRepoPath)}
@@ -217,18 +216,20 @@ export function Topbar() {
 
 function ScanDialog({ onClose }: { onClose: () => void }) {
   const lastRepoPath = getCurrentRepoPath();
-  const [repoPath, setRepoPath] = useState(lastRepoPath || '.');
+  const [repoPath, setRepoPath] = useState(lastRepoPath || '..');
   const [scanType, setScanType] = useState<ScanType>('ghost_hunter');
   const startScan = useStartScan();
+  const { data: dirsData, isLoading: dirsLoading } = useScanDirectories();
 
   async function handleStart() {
     const result = await startScan.mutateAsync({ repoPath, scanType });
     if (result.success) {
-      // Save to localStorage so it persists across scans
       localStorage.setItem(REPO_PATH_KEY, repoPath);
       onClose();
     }
   }
+
+  const dirs = dirsData?.success ? dirsData.dirs : [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -247,14 +248,27 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Repository Path
+              Repository
             </label>
-            <input
-              value={repoPath}
-              onChange={(e) => setRepoPath(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
-              placeholder="../path/to/repo"
-            />
+            {dirsLoading ? (
+              <div className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-500">
+                <Loader2 size={14} className="animate-spin" /> Loading
+                directories...
+              </div>
+            ) : (
+              <select
+                value={repoPath}
+                onChange={(e) => setRepoPath(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
+              >
+                <option value="..">Parent directories</option>
+                {dirs.map((dir) => (
+                  <option key={dir.path} value={dir.path}>
+                    {dir.isGitRepo ? '🔀' : '📁'} {dir.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
