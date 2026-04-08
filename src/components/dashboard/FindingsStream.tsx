@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useFindings } from '@/hooks/use-findings';
 import {
   Loader2,
@@ -31,6 +32,14 @@ const SEVERITY_CAPITALIZED: Record<string, string> = {
 };
 
 export function FindingsStream() {
+  return (
+    <Suspense fallback={<SkeletonStream />}>
+      <FindingsStreamInner />
+    </Suspense>
+  );
+}
+
+function FindingsStreamInner() {
   const searchParams = useSearchParams();
   const q = searchParams.get('q') || undefined;
   const queryClient = useQueryClient();

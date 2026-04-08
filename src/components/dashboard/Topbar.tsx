@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import {
   Search,
@@ -35,6 +35,35 @@ function extractRepoName(repoPath: string): string {
 type ScanType = 'ghost_hunter' | 'git_recent' | 'git_full' | 'git_orphan';
 
 export function Topbar() {
+  return (
+    <Suspense fallback={<TopbarSkeleton />}>
+      <TopbarInner />
+    </Suspense>
+  );
+}
+
+function TopbarSkeleton() {
+  return (
+    <header className="flex items-center justify-between gap-4 w-full">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 bg-zinc-200 rounded animate-pulse" />
+        <div className="space-y-2">
+          <div className="h-4 w-20 bg-zinc-200 rounded animate-pulse" />
+          <div className="h-3 w-32 bg-zinc-200 rounded animate-pulse" />
+        </div>
+      </div>
+      <div className="hidden md:flex flex-1 max-w-md mx-8">
+        <div className="w-full h-10 bg-zinc-200 rounded-lg animate-pulse" />
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="h-10 w-24 bg-zinc-200 rounded-lg animate-pulse" />
+        <div className="h-10 w-24 bg-zinc-200 rounded-lg animate-pulse" />
+      </div>
+    </header>
+  );
+}
+
+function TopbarInner() {
   const [showDialog, setShowDialog] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
