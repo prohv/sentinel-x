@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.0-beta] — 2026-04-08
+
+### Added
+- **Finding Inspection Hub:** Modular Detail Dialog featuring:
+  - Exact file path resolution (VCS vs Phantom)
+  - Commit author/hash context with code snippet evidence
+  - One-click remediation workflow
+- **Remediation Pipeline:**
+  - `False Positive` workflow (Blue State) — removes finding from tracking
+  - `Verify & Shield` workflow (Green State) — isolates artifact in Secure Vault
+- **Secure Vault Engine:**
+  - Standardized AES-256-GCM encryption for shielded artifacts
+  - Structural isolation from local repository state
+- **Bulk Defenses:**
+  - `Shield All` — Unified Topbar interaction to secure all open threats instantly
+  - Multi-threaded bulk suppression logic
+- **Global Data Integrity:**
+  - Synchronized "Active Threats" and "Rules Distribution" metrics
+  - Real-time cache invalidation for instant remediation feedback
+- **Data Export:** Instant CSV reporting for compliance and auditing
+- **Developer Utilities:** `db:reset` script for rapid demo re-initialization
+
+### Fixed
+- Severity weighting sync: "Active Threats" now accurately maps to 100% of open findings
+- Discriminated union handling in Topbar stats polling
+- Redundant logo assets consolidated into single `logo.svg`
+
 ## [0.3.0] — 2026-04-08
 
 ### Added
