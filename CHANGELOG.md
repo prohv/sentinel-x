@@ -42,6 +42,9 @@ All notable changes to this project will be documented in this file.
 - Expanded Tech Stack table with Markdown, Charts, and Fonts entries
 - Updated project structure diagram to reflect actual file layout
 
+### Deprecated
+- **Shield All** — Bulk shield button and success dialog removed from Topbar
+
 ### Dependencies
 - Added `marked` v18.0.0 for Markdown parsing/rendering
 
