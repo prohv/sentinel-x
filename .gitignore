@@ -49,6 +49,9 @@ SENTINEL_X_CODE_GUIDE.md
 
 #db
 sentinel.db
+sentinel.db-wal
+sentinel.db-shm
+*.db*
 
 #demo
 chaos-demo/
