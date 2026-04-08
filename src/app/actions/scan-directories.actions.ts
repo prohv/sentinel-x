@@ -22,8 +22,8 @@ export async function scanDirectories(
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
 
-      // Skip hidden dirs except those that might be repos
-      if (entry.name.startsWith('.') && entry.name !== '.github') continue;
+      // Skip hidden dirs
+      if (entry.name.startsWith('.')) continue;
 
       // Skip common non-repo directories
       const skipDirs = new Set([
@@ -38,14 +38,15 @@ export async function scanDirectories(
 
       const fullPath = join(rootPath, entry.name);
 
-      // Check if it's a git repo (has .git folder)
+      // Only include if it's a valid git repo (has .git folder)
       let isGitRepo = false;
       try {
         const gitPath = join(fullPath, '.git');
         const gitStat = await stat(gitPath);
         isGitRepo = gitStat.isDirectory();
       } catch {
-        // Not a git repo, but still include it
+        // Not a git repo — skip it entirely
+        continue;
       }
 
       dirs.push({
@@ -55,11 +56,8 @@ export async function scanDirectories(
       });
     }
 
-    // Sort: git repos first, then alphabetically
-    dirs.sort((a, b) => {
-      if (a.isGitRepo !== b.isGitRepo) return b.isGitRepo ? 1 : -1;
-      return a.name.localeCompare(b.name);
-    });
+    // Sort alphabetically
+    dirs.sort((a, b) => a.name.localeCompare(b.name));
 
     return { success: true, dirs };
   } catch (err) {

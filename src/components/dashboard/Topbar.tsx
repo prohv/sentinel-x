@@ -10,9 +10,6 @@ import {
   Shield,
   CheckCircle,
   AlertTriangle,
-  FolderGit,
-  Folder,
-  GitBranch,
 } from 'lucide-react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useStartScan } from '@/hooks/use-start-scan';
@@ -20,6 +17,7 @@ import { useDashboardStats } from '@/hooks/use-dashboard-stats';
 import { useScanDirectories } from '@/hooks/use-scan-directories';
 import { shieldAllFindings } from '@/app/actions/get-findings.actions';
 import { useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 const REPO_PATH_KEY = 'sentinel-x-repo-path';
 
@@ -216,10 +214,17 @@ export function Topbar() {
 
 function ScanDialog({ onClose }: { onClose: () => void }) {
   const lastRepoPath = getCurrentRepoPath();
-  const [repoPath, setRepoPath] = useState(lastRepoPath || '..');
-  const [scanType, setScanType] = useState<ScanType>('ghost_hunter');
   const startScan = useStartScan();
   const { data: dirsData, isLoading: dirsLoading } = useScanDirectories();
+  const dirs = dirsData?.success ? dirsData.dirs : [];
+
+  // Compute default path using useMemo to avoid useEffect + setState
+  const defaultPath = useMemo(() => {
+    return lastRepoPath || (dirs.length > 0 ? dirs[0].path : '');
+  }, [lastRepoPath, dirs.length]);
+
+  const [repoPath, setRepoPath] = useState(defaultPath);
+  const [scanType, setScanType] = useState<ScanType>('ghost_hunter');
 
   async function handleStart() {
     const result = await startScan.mutateAsync({ repoPath, scanType });
@@ -228,8 +233,6 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
       onClose();
     }
   }
-
-  const dirs = dirsData?.success ? dirsData.dirs : [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -253,7 +256,7 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
             {dirsLoading ? (
               <div className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-500">
                 <Loader2 size={14} className="animate-spin" /> Loading
-                directories...
+                repositories...
               </div>
             ) : (
               <select
@@ -261,10 +264,9 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setRepoPath(e.target.value)}
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
               >
-                <option value="..">Parent directories</option>
                 {dirs.map((dir) => (
                   <option key={dir.path} value={dir.path}>
-                    {dir.isGitRepo ? '🔀' : '📁'} {dir.name}
+                    🔀 {dir.name}
                   </option>
                 ))}
               </select>
