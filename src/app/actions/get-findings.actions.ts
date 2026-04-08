@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { findings } from '@/lib/db/schema';
+import { findings, scans } from '@/lib/db/schema';
 import { eq, desc, count, and, like, or } from 'drizzle-orm';
 import type { FindingsResult } from './scan-types';
 import { FindingsQuerySchema } from './scan-types';
@@ -43,8 +43,11 @@ export async function getFindings(input: unknown): Promise<FindingsResult> {
           status: findings.status,
           commitHash: findings.commitHash,
           author: findings.author,
+          scanType: scans.type,
+          repoPath: scans.repoPath,
         })
         .from(findings)
+        .leftJoin(scans, eq(findings.scanId, scans.id))
         .where(whereClause)
         .orderBy(desc(findings.id))
         .limit(limit)

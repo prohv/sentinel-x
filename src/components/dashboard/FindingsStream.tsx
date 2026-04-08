@@ -1,8 +1,18 @@
 'use client';
 
 import { useFindings } from '@/hooks/use-findings';
-import { Loader2 } from 'lucide-react';
+import {
+  Loader2,
+  X,
+  Server,
+  GitCommit,
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+} from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import type { FindingRow } from '@/app/actions/scan-types';
 
 const severityColor: Record<string, { text: string; dot: string }> = {
   critical: { text: 'text-rose-600', dot: 'bg-rose-500' },
@@ -21,6 +31,9 @@ const SEVERITY_CAPITALIZED: Record<string, string> = {
 export function FindingsStream() {
   const searchParams = useSearchParams();
   const q = searchParams.get('q') || undefined;
+  const [selectedFinding, setSelectedFinding] = useState<FindingRow | null>(
+    null,
+  );
 
   const { data, isLoading } = useFindings({ limit: 12, searchQuery: q });
 
@@ -75,6 +88,7 @@ export function FindingsStream() {
                 return (
                   <tr
                     key={f.id}
+                    onClick={() => setSelectedFinding(f)}
                     className="hover:bg-zinc-50 transition-colors group cursor-pointer"
                   >
                     <td className="px-5 py-3.5 whitespace-nowrap">
@@ -103,6 +117,13 @@ export function FindingsStream() {
           </table>
         )}
       </div>
+
+      {selectedFinding && (
+        <FindingDialog
+          finding={selectedFinding}
+          onClose={() => setSelectedFinding(null)}
+        />
+      )}
     </div>
   );
 }
@@ -111,6 +132,139 @@ function SkeletonStream() {
   return (
     <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full min-h-[300px] items-center justify-center">
       <Loader2 className="animate-spin text-zinc-300" size={32} />
+    </div>
+  );
+}
+
+function FindingDialog({
+  finding,
+  onClose,
+}: {
+  finding: FindingRow;
+  onClose: () => void;
+}) {
+  if (!finding) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="p-5 border-b border-zinc-100 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${severityColor[finding.severity]?.dot ?? 'bg-zinc-500'} text-white`}
+              >
+                {finding.severity} THREAT
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-100 text-zinc-500 border border-zinc-200">
+                {finding.scanType?.replace('git_', '') || 'HUNTER'}
+              </span>
+            </div>
+            <h2 className="font-epilogue font-bold text-xl text-zinc-900">
+              {finding.rule}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-zinc-400 hover:text-zinc-600 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-colors border border-transparent hover:border-zinc-200"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6">
+          {/* Path Trace */}
+          <div>
+            <h3 className="font-epilogue font-semibold text-sm text-zinc-900 mb-3 flex items-center gap-2">
+              <Server size={14} className="text-zinc-400" />
+              Compromise Trace
+            </h3>
+            <div className="bg-zinc-50 rounded-xl p-4 border border-zinc-100 font-mono text-xs text-zinc-600 space-y-2 flex flex-col">
+              <div className="flex items-start gap-2">
+                <span className="text-zinc-400 pt-0.5">Exact File:</span>
+                <span className="font-semibold text-zinc-900 break-all bg-white px-2 py-0.5 rounded shadow-sm border border-zinc-200">
+                  {(() => {
+                    let rawPath = finding.path;
+                    if (rawPath.startsWith('orphan:')) {
+                      rawPath = rawPath.replace('orphan:', '');
+                    } else if (rawPath.startsWith('git:')) {
+                      return `[Commit Diff Hash] ${rawPath.replace('git:', '')}`;
+                    }
+                    const baseRepo = finding.repoPath
+                      ? `${finding.repoPath.replace(/\/$/, '')}/`
+                      : '';
+                    return `${baseRepo}${rawPath}`;
+                  })()}
+                  {finding.line > 0 && ` : Line ${finding.line}`}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Git Meta */}
+          {finding.commitHash && (
+            <div>
+              <h3 className="font-epilogue font-semibold text-sm text-zinc-900 mb-3 flex items-center gap-2">
+                <GitCommit size={14} className="text-zinc-400" />
+                Commit Context
+              </h3>
+              <div className="flex items-center gap-4 bg-zinc-50 rounded-xl p-4 border border-zinc-100">
+                <div className="flex-1">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold mb-1">
+                    Author
+                  </p>
+                  <p className="text-sm font-medium text-zinc-900">
+                    {finding.author || 'Unknown'}
+                  </p>
+                </div>
+                <div className="flex-1 border-l border-zinc-200 pl-4">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold mb-1">
+                    Hash
+                  </p>
+                  <p className="text-sm font-mono text-zinc-900 bg-white px-2 py-0.5 rounded shadow-sm border border-zinc-200 inline-block">
+                    {finding.commitHash.substring(0, 8)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Code Snippet */}
+          <div>
+            <h3 className="font-epilogue font-semibold text-sm text-zinc-900 mb-3 flex items-center gap-2">
+              <FileText size={14} className="text-zinc-400" />
+              Source Evidence
+            </h3>
+            <div className="bg-[#18181b] rounded-xl p-4 overflow-x-auto border border-zinc-800 shadow-inner">
+              <pre className="font-mono text-[13px] text-zinc-300 leading-relaxed">
+                <code>{finding.snippet}</code>
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-5 border-t border-zinc-100 bg-zinc-50/80 flex items-center justify-between gap-3">
+          <p className="font-manrope text-xs text-zinc-500">
+            Confidence:{' '}
+            <span className="font-semibold text-zinc-700">
+              {finding.confidence}%
+            </span>
+          </p>
+          <div className="flex items-center gap-3">
+            <button className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-zinc-600 bg-white border border-zinc-200 rounded-lg shadow-sm hover:bg-zinc-50 transition-colors">
+              <AlertTriangle size={16} className="text-zinc-400" />
+              Flag False Positive
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-white bg-violet-600 rounded-lg shadow-sm hover:bg-violet-500 transition-colors shadow-violet-500/20">
+              <CheckCircle size={16} />
+              Verify & Shield
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -21,6 +21,8 @@ export type FindingRow = {
   status: string;
   commitHash: string | null;
   author: string | null;
+  scanType?: string | null;
+  repoPath?: string | null;
 };
 
 export type ScanRow = {
