@@ -44,16 +44,22 @@ export function LandingNav() {
         {/* Center: Nav Links (hidden on mobile) */}
         <div className="hidden md:flex items-center gap-8">
           <Link
+            href="/about"
+            className="font-manrope text-sm text-zinc-600 hover:text-violet-700 transition-colors"
+          >
+            About
+          </Link>
+          <Link
             href="/docs"
             className="font-manrope text-sm text-zinc-600 hover:text-violet-700 transition-colors"
           >
             Docs
           </Link>
           <Link
-            href="/about"
+            href="/usage"
             className="font-manrope text-sm text-zinc-600 hover:text-violet-700 transition-colors"
           >
-            About
+            Usage
           </Link>
           <Link
             href="/dashboard"

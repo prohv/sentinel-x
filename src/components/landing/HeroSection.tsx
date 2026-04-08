@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export function HeroSection() {
   return (
-    <section className="pt-24 pb-0 px-4 text-center">
+    <section className="pt-16 pb-0 px-4 text-center">
       <div className="mx-auto max-w-4xl">
         {/* Eyebrow badge */}
         <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-3 py-1 mb-6">

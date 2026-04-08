@@ -22,15 +22,6 @@ export function HeroVisual() {
               priority
               unoptimized
             />
-            {/* Fallback overlay shown regardless — acts as a legible label */}
-            <div
-              className="absolute inset-0 bg-zinc-950/80 rounded-t-2xl
-                            flex items-center justify-center"
-            >
-              <span className="font-manrope text-xs text-zinc-400 tracking-widest uppercase">
-                Dashboard Preview
-              </span>
-            </div>
           </div>
         </div>
 
@@ -38,7 +29,7 @@ export function HeroVisual() {
 
         {/* Top-left: Ghost Hunter */}
         <div
-          className="hidden md:block absolute top-12 left-12
+          className="hidden md:block absolute top-20 left-8
                         bg-white rounded-2xl shadow-lg px-4 py-3 max-w-[200px]"
         >
           <div className="flex items-center gap-2 mb-1">
@@ -60,7 +51,7 @@ export function HeroVisual() {
 
         {/* Top-right: Vault */}
         <div
-          className="hidden md:block absolute top-12 right-12
+          className="hidden md:block absolute top-16 right-12
                         bg-white rounded-2xl shadow-lg px-4 py-3"
         >
           <div className="flex items-center gap-2">
@@ -79,7 +70,7 @@ export function HeroVisual() {
 
         {/* Bottom-left: Taint Analyzer */}
         <div
-          className="hidden md:block absolute bottom-16 left-12
+          className="hidden md:block absolute bottom-14 left-14
                         bg-white rounded-2xl shadow-lg px-4 py-3 max-w-[220px]"
         >
           <p className="font-manrope font-semibold text-xs text-zinc-900">
