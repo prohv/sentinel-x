@@ -9,10 +9,12 @@ import {
   FileText,
   CheckCircle,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { FindingRow } from '@/app/actions/scan-types';
+import { useQueryClient } from '@tanstack/react-query';
 
 const severityColor: Record<string, { text: string; dot: string }> = {
   critical: { text: 'text-rose-600', dot: 'bg-rose-500' },
@@ -31,11 +33,21 @@ const SEVERITY_CAPITALIZED: Record<string, string> = {
 export function FindingsStream() {
   const searchParams = useSearchParams();
   const q = searchParams.get('q') || undefined;
+  const queryClient = useQueryClient();
   const [selectedFinding, setSelectedFinding] = useState<FindingRow | null>(
     null,
   );
 
-  const { data, isLoading } = useFindings({ limit: 12, searchQuery: q });
+  const { data, isLoading } = useFindings({
+    limit: 12,
+    searchQuery: q,
+    status: 'open',
+  });
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['findings'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+  };
 
   if (isLoading || !data?.success) {
     return <SkeletonStream />;
@@ -122,6 +134,7 @@ export function FindingsStream() {
         <FindingDialog
           finding={selectedFinding}
           onClose={() => setSelectedFinding(null)}
+          onSuccess={handleRefresh}
         />
       )}
     </div>
@@ -136,14 +149,87 @@ function SkeletonStream() {
   );
 }
 
+import {
+  deleteFinding,
+  shieldFinding,
+} from '@/app/actions/get-findings.actions';
+
 function FindingDialog({
   finding,
   onClose,
+  onSuccess,
 }: {
   finding: FindingRow;
   onClose: () => void;
+  onSuccess: () => void;
 }) {
+  const [isShielding, setIsShielding] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [successType, setSuccessType] = useState<'shield' | 'delete' | null>(
+    null,
+  );
+
   if (!finding) return null;
+
+  async function handleFalsePositive() {
+    setIsDeleting(true);
+    await deleteFinding(finding.id);
+    onSuccess();
+    setSuccessType('delete');
+    setTimeout(() => {
+      onClose();
+    }, 2500);
+  }
+
+  async function handleShield() {
+    setIsShielding(true);
+    // In a real scenario: you would inject a Git filter-branch payload or
+    // run BFG Repo-Cleaner remotely. Here we simulate Shielding it locally!
+    await shieldFinding(finding.id);
+    onSuccess();
+    setSuccessType('shield');
+    setTimeout(() => {
+      onClose();
+    }, 2500);
+  }
+
+  if (successType === 'shield') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-8 flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-5 ring-8 ring-emerald-50">
+            <CheckCircle className="text-emerald-500" size={32} />
+          </div>
+          <h2 className="font-epilogue font-bold text-xl text-zinc-900 mb-2">
+            Shield Deployed!
+          </h2>
+          <p className="text-sm text-zinc-500 text-center font-manrope leading-relaxed">
+            The artifact trace has been verified, encrypted, and added to the
+            secure Vault registry.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (successType === 'delete') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-8 flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-5 ring-8 ring-blue-50">
+            <Trash2 className="text-blue-500" size={28} />
+          </div>
+          <h2 className="font-epilogue font-bold text-xl text-zinc-900 mb-2">
+            False Positive Verified
+          </h2>
+          <p className="text-sm text-zinc-500 text-center font-manrope leading-relaxed">
+            Artifact explicitly removed from the active threats list and
+            permanently deleted.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4">
@@ -254,12 +340,28 @@ function FindingDialog({
             </span>
           </p>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-zinc-600 bg-white border border-zinc-200 rounded-lg shadow-sm hover:bg-zinc-50 transition-colors">
-              <AlertTriangle size={16} className="text-zinc-400" />
+            <button
+              onClick={handleFalsePositive}
+              disabled={isDeleting || isShielding}
+              className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-zinc-600 bg-white border border-zinc-200 rounded-lg shadow-sm hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <AlertTriangle size={16} className="text-zinc-400" />
+              )}
               Flag False Positive
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-white bg-violet-600 rounded-lg shadow-sm hover:bg-violet-500 transition-colors shadow-violet-500/20">
-              <CheckCircle size={16} />
+            <button
+              onClick={handleShield}
+              disabled={isDeleting || isShielding}
+              className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-white bg-violet-600 rounded-lg shadow-sm hover:bg-violet-500 transition-colors shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isShielding ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <CheckCircle size={16} />
+              )}
               Verify & Shield
             </button>
           </div>

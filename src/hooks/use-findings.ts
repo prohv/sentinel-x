@@ -6,6 +6,7 @@ type FindingsFilters = {
   scanId?: number;
   severity?: string;
   searchQuery?: string;
+  status?: string;
   limit?: number;
   offset?: number;
 };

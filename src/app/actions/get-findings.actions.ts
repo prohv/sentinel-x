@@ -12,12 +12,13 @@ export async function getFindings(input: unknown): Promise<FindingsResult> {
     return { success: false, error: parsed.error.issues[0].message };
   }
 
-  const { scanId, severity, limit, offset, searchQuery } = parsed.data;
+  const { scanId, severity, limit, offset, searchQuery, status } = parsed.data;
 
   try {
     const conditions = [];
     if (scanId !== undefined) conditions.push(eq(findings.scanId, scanId));
     if (severity) conditions.push(eq(findings.severity, severity));
+    if (status) conditions.push(eq(findings.status, status));
     if (searchQuery) {
       conditions.push(
         or(
@@ -132,5 +133,28 @@ export async function exportFindingsCSV(): Promise<
   } catch (err) {
     console.error('[exportFindingsCSV] Error:', err);
     return { success: false, error: 'Failed to generate CSV export.' };
+  }
+}
+
+export async function deleteFinding(id: number) {
+  try {
+    await db.delete(findings).where(eq(findings.id, id));
+    return { success: true };
+  } catch (err) {
+    console.error('[deleteFinding] Error:', err);
+    return { success: false, error: 'Failed to delete finding.' };
+  }
+}
+
+export async function shieldFinding(id: number) {
+  try {
+    await db
+      .update(findings)
+      .set({ status: 'shielded' })
+      .where(eq(findings.id, id));
+    return { success: true };
+  } catch (err) {
+    console.error('[shieldFinding] Error:', err);
+    return { success: false, error: 'Failed to shield finding.' };
   }
 }
