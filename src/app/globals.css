@@ -30,3 +30,14 @@ body {
 .gradient-taint   { background: linear-gradient(135deg, #FF6B6B, #FF8E53); }
 .gradient-clean   { background: linear-gradient(135deg, #6EE7F7, #A78BFA); }
 .gradient-neutral { background: linear-gradient(135deg, #E0E7FF, #F0FFFE); }
+
+/* Landing Page — Hero Visual */
+.hero-visual-gradient {
+  background: linear-gradient(
+    135deg,
+    #C4F135 0%,
+    #A3E6C8 35%,
+    #B8D4F8 65%,
+    #E8D5F5 100%
+  );
+}
