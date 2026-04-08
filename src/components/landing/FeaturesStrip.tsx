@@ -28,7 +28,7 @@ const FEATURES: Feature[] = [
 
 export function FeaturesStrip() {
   return (
-    <section className="py-20 px-4">
+    <section id="features" className="py-20 px-4">
       <div className="mx-auto max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6">
         {FEATURES.map((feature) => (
           <div

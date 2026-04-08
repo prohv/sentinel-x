@@ -2,7 +2,7 @@ import Image from 'next/image';
 
 export function HeroVisual() {
   return (
-    <div className="mt-14 mx-auto max-w-6xl px-4 pb-0">
+    <div id="hero-visual" className="mt-14 mx-auto max-w-6xl px-4 pb-0">
       <div
         className="hero-visual-gradient rounded-3xl overflow-hidden
                       min-h-[320px] md:min-h-[520px] relative"

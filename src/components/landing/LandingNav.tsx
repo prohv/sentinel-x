@@ -4,6 +4,13 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
+function scrollTo(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - 64;
+  window.scrollTo({ top, behavior: 'smooth' });
+}
+
 export function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -13,6 +20,9 @@ export function LandingNav() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const navLinkClass =
+    'font-manrope text-sm text-zinc-600 hover:text-violet-700 transition-colors';
 
   return (
     <nav
@@ -41,46 +51,40 @@ export function LandingNav() {
           </span>
         </Link>
 
-        {/* Center: Nav Links (hidden on mobile) */}
+        {/* Center: Nav Links (desktop) */}
         <div className="hidden md:flex items-center gap-8">
-          <Link
-            href="/about"
-            className="font-manrope text-sm text-zinc-600 hover:text-violet-700 transition-colors"
-          >
-            About
-          </Link>
-          <Link
-            href="/docs"
-            className="font-manrope text-sm text-zinc-600 hover:text-violet-700 transition-colors"
-          >
+          <Link href="/docs" className={navLinkClass}>
             Docs
           </Link>
-          <Link
-            href="/usage"
-            className="font-manrope text-sm text-zinc-600 hover:text-violet-700 transition-colors"
+
+          <button
+            onClick={() => scrollTo('hero-visual')}
+            className={navLinkClass}
           >
-            Usage
-          </Link>
-          <Link
-            href="/dashboard"
-            className="font-manrope text-sm text-zinc-600 hover:text-violet-700 transition-colors"
-          >
+            Preview
+          </button>
+
+          <button onClick={() => scrollTo('features')} className={navLinkClass}>
+            Features
+          </button>
+
+          <Link href="/dashboard" className={navLinkClass}>
             Dashboard
           </Link>
         </div>
 
-        {/* Right: Sign In + Mobile Menu */}
+        {/* Right: Open Dashboard pill + mobile hamburger */}
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard"
-            id="nav-sign-in"
+            id="nav-open-dashboard"
             className="hidden md:inline-flex font-manrope font-semibold text-sm
                        bg-zinc-950 text-white px-4 py-2 rounded-full
                        hover:bg-zinc-800 transition-colors min-h-[36px] items-center"
           >
             Open Dashboard
           </Link>
-          {/* Mobile hamburger */}
+
           <button
             id="nav-mobile-menu-toggle"
             aria-label="Toggle menu"
@@ -102,13 +106,27 @@ export function LandingNav() {
           >
             Docs
           </Link>
-          <Link
-            href="/about"
-            onClick={() => setMobileOpen(false)}
-            className="font-manrope text-sm text-zinc-700 hover:text-violet-700 transition-colors py-2"
+
+          <button
+            onClick={() => {
+              scrollTo('hero-visual');
+              setMobileOpen(false);
+            }}
+            className="font-manrope text-sm text-zinc-700 hover:text-violet-700 transition-colors py-2 text-left"
           >
-            About
-          </Link>
+            Preview
+          </button>
+
+          <button
+            onClick={() => {
+              scrollTo('features');
+              setMobileOpen(false);
+            }}
+            className="font-manrope text-sm text-zinc-700 hover:text-violet-700 transition-colors py-2 text-left"
+          >
+            Features
+          </button>
+
           <Link
             href="/dashboard"
             onClick={() => setMobileOpen(false)}
@@ -116,6 +134,7 @@ export function LandingNav() {
           >
             Dashboard
           </Link>
+
           <Link
             href="/dashboard"
             onClick={() => setMobileOpen(false)}
