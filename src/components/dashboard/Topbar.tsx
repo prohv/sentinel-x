@@ -17,7 +17,6 @@ import { useDashboardStats } from '@/hooks/use-dashboard-stats';
 import { useScanDirectories } from '@/hooks/use-scan-directories';
 import { shieldAllFindings } from '@/app/actions/get-findings.actions';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
 
 const REPO_PATH_KEY = 'sentinel-x-repo-path';
 
@@ -45,29 +44,18 @@ export function Topbar() {
   const queryClient = useQueryClient();
   const [isShieldingAll, setIsShieldingAll] = useState(false);
   const [showShieldAllSuccess, setShowShieldAllSuccess] = useState(false);
-  const [currentRepoPath, setCurrentRepoPath] = useState(() =>
-    getCurrentRepoPath(),
-  );
+  const [currentRepoPath, setCurrentRepoPath] = useState<string | null>(null);
 
-  // Listen for repo path changes
   useEffect(() => {
-    const handleStorageChange = () => {
-      setCurrentRepoPath(getCurrentRepoPath());
-    };
-    window.addEventListener('storage', handleStorageChange);
-    // Poll for changes within same window
-    const interval = setInterval(() => {
-      const latest = getCurrentRepoPath();
-      if (latest !== currentRepoPath) {
-        setCurrentRepoPath(latest);
-      }
-    }, 1000);
-
+    const update = () => setCurrentRepoPath(getCurrentRepoPath());
+    // Defer initial read to a callback (not synchronously in effect body)
+    const id = setTimeout(update, 0);
+    const interval = setInterval(update, 1000);
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      clearTimeout(id);
       clearInterval(interval);
     };
-  }, [currentRepoPath]);
+  }, []);
 
   const handleShieldAll = async () => {
     setIsShieldingAll(true);
@@ -122,7 +110,7 @@ export function Topbar() {
             <p className="font-manrope text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
               Repository:{' '}
               <span className="font-mono text-zinc-800 font-medium">
-                {extractRepoName(currentRepoPath)}
+                {currentRepoPath ? extractRepoName(currentRepoPath) : '—'}
               </span>
             </p>
           </div>
@@ -218,12 +206,9 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
   const { data: dirsData, isLoading: dirsLoading } = useScanDirectories();
   const dirs = dirsData?.success ? dirsData.dirs : [];
 
-  // Compute default path using useMemo to avoid useEffect + setState
-  const defaultPath = useMemo(() => {
-    return lastRepoPath || (dirs.length > 0 ? dirs[0].path : '');
-  }, [lastRepoPath, dirs.length]);
-
-  const [repoPath, setRepoPath] = useState(defaultPath);
+  const [repoPath, setRepoPath] = useState(
+    lastRepoPath || (dirs.length > 0 ? dirs[0].path : ''),
+  );
   const [scanType, setScanType] = useState<ScanType>('ghost_hunter');
 
   async function handleStart() {
