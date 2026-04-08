@@ -190,23 +190,41 @@ function FindingDialog({
     setSuccessType('shield');
     setTimeout(() => {
       onClose();
-    }, 2500);
+    }, 4500);
   }
 
   if (successType === 'shield') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-8 flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-5 ring-8 ring-emerald-50">
-            <CheckCircle className="text-emerald-500" size={32} />
+        <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col items-center justify-center animate-in zoom-in-95 duration-300 overflow-hidden">
+          <div className="p-8 flex flex-col items-center">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-5 ring-8 ring-emerald-50">
+              <CheckCircle className="text-emerald-500" size={32} />
+            </div>
+            <h2 className="font-epilogue font-bold text-xl text-zinc-900 mb-2 text-center">
+              Shield Deployed!
+            </h2>
+            <p className="text-sm text-zinc-500 text-center font-manrope leading-relaxed mb-6">
+              The artifact trace has been verified, encrypted, and isolated in
+              the secure Vault registry.
+            </p>
+
+            <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-left flex items-start gap-3">
+              <AlertTriangle
+                className="text-amber-500 shrink-0 mt-0.5"
+                size={16}
+              />
+              <div>
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-700 mb-1">
+                  Next Steps
+                </h4>
+                <p className="text-xs font-medium text-amber-700/80 leading-relaxed">
+                  Be sure to rotate this key at the provider level soon to fully
+                  secure the repo.
+                </p>
+              </div>
+            </div>
           </div>
-          <h2 className="font-epilogue font-bold text-xl text-zinc-900 mb-2">
-            Shield Deployed!
-          </h2>
-          <p className="text-sm text-zinc-500 text-center font-manrope leading-relaxed">
-            The artifact trace has been verified, encrypted, and added to the
-            secure Vault registry.
-          </p>
         </div>
       </div>
     );
