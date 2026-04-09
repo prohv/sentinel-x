@@ -1,5 +1,16 @@
+import {
+  ShieldCheck,
+  Flame,
+  Activity,
+  History,
+  Lock,
+  FileBarChart2,
+  LucideIcon,
+} from 'lucide-react';
+
 type Feature = {
-  icon: string;
+  icon: LucideIcon;
+  iconColor: string;
   iconBg: string;
   title: string;
   body: string;
@@ -7,48 +18,87 @@ type Feature = {
 
 const FEATURES: Feature[] = [
   {
-    icon: '👻',
-    iconBg: 'bg-zinc-950',
-    title: 'Ghost Hunter',
-    body: 'Recursive file + git history scanner. Finds secrets that were deleted 30 commits ago.',
+    icon: ShieldCheck,
+    iconColor: 'text-emerald-600',
+    iconBg: 'bg-emerald-50',
+    title: 'Offline Scanner',
+    body: 'Ghost Hunter scans your filesystem and git history entirely locally. Your code and secrets never leave your machine.',
   },
   {
-    icon: '⚠',
-    iconBg: 'bg-rose-500',
-    title: 'Taint Analyzer',
-    body: 'Detects supply chain breaches like the 2026 Axios attack. Correlates packages to exposed secrets instantly.',
+    icon: Flame,
+    iconColor: 'text-violet-600',
+    iconBg: 'bg-violet-50',
+    title: 'Git History Purge',
+    body: 'A surgical 6-step pipeline to permanently erase secrets from every commit in your history without corrupting the repo.',
   },
   {
-    icon: '🔒',
-    iconBg: 'bg-violet-600',
-    title: 'Local Vault',
-    body: 'Encrypts and stores NHIs locally. Replaces raw secrets with SENTINEL_REF_IDs. Zero cloud. Zero telemetry.',
+    icon: Activity,
+    iconColor: 'text-blue-600',
+    iconBg: 'bg-blue-50',
+    title: 'Taint Tree Analyzer',
+    body: 'AST-based analysis traces how secrets propagate from source variables to dangerous sink functions in your code.',
+  },
+  {
+    icon: History,
+    iconColor: 'text-amber-600',
+    iconBg: 'bg-amber-50',
+    title: 'Secret Forensics',
+    body: 'Deep-dive into the git lifecycle of any leak. Reconstruct exactly when and how a secret moved through your repository.',
+  },
+  {
+    icon: Lock,
+    iconColor: 'text-rose-600',
+    iconBg: 'bg-rose-50',
+    title: 'Secure Vault',
+    body: 'AES-256-GCM authenticated encryption for shielded artifacts. Decouples sensitive data from the local repository state.',
+  },
+  {
+    icon: FileBarChart2,
+    iconColor: 'text-zinc-600',
+    iconBg: 'bg-zinc-100',
+    title: 'Compliance Reporting',
+    body: 'Business-readable reports translating technical findings into enterprise risk categories for security audit handoffs.',
   },
 ];
 
 export function FeaturesStrip() {
   return (
-    <section id="features" className="py-20 px-4">
-      <div className="mx-auto max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6">
-        {FEATURES.map((feature) => (
-          <div
-            key={feature.title}
-            className="bg-zinc-50 rounded-2xl p-6 border border-zinc-100"
-          >
+    <section
+      id="features"
+      className="py-24 px-4 bg-white relative overflow-hidden"
+    >
+      <div className="mx-auto max-w-6xl">
+        <div className="text-center mb-16">
+          <h2 className="text-zinc-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">
+            Core Infrastructure
+          </h2>
+          <h3 className="font-epilogue font-bold text-3xl md:text-4xl text-zinc-900 leading-tight">
+            Enterprise-grade security,
+            <br />
+            <span className="text-violet-600">developer-first simplicity.</span>
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {FEATURES.map((feature) => (
             <div
-              className={`w-9 h-9 rounded-xl ${feature.iconBg} flex items-center
-                          justify-center text-white mb-4 text-lg`}
+              key={feature.title}
+              className="group p-8 rounded-[32px] bg-zinc-50 border border-zinc-100 hover:bg-white hover:border-violet-200 hover:shadow-[0_20px_50px_rgba(0,0,0,0.05)] transition-all duration-500"
             >
-              {feature.icon}
+              <div
+                className={`w-12 h-12 rounded-2xl ${feature.iconBg} flex items-center justify-center ${feature.iconColor} mb-6 group-hover:scale-110 transition-transform duration-500`}
+              >
+                <feature.icon size={24} />
+              </div>
+              <h3 className="font-epilogue font-bold text-lg text-zinc-900 mb-3">
+                {feature.title}
+              </h3>
+              <p className="font-manrope text-sm text-zinc-500 leading-relaxed">
+                {feature.body}
+              </p>
             </div>
-            <h3 className="font-epilogue font-bold text-base text-zinc-900">
-              {feature.title}
-            </h3>
-            <p className="font-manrope text-sm text-zinc-500 mt-2 leading-relaxed">
-              {feature.body}
-            </p>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );
