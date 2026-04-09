@@ -67,8 +67,9 @@ export function BatchPurgeModal({
 }) {
   const queryClient = useQueryClient();
   const { data } = useFindings({ limit: 200, status: 'open' });
+  const findingsRaw = data?.success ? data.items : [];
 
-  const findings = (data?.items ?? []).filter((f) =>
+  const findings = findingsRaw.filter((f) =>
     selectedIds.includes(f.id.toString()),
   );
 

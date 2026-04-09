@@ -70,6 +70,7 @@ export async function traceSecret(
     author: string;
     date: string;
     file: string;
+    message: string;
   }[] = [];
 
   try {

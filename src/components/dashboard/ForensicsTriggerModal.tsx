@@ -14,7 +14,7 @@ import { useFindings } from '@/hooks/use-findings';
 export function ForensicsTriggerModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { data, isLoading } = useFindings({ limit: 100, status: 'open' });
-  const findings = data?.items || [];
+  const findings = data?.success ? data.items : [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-md p-4 animate-in fade-in duration-300 font-manrope">
