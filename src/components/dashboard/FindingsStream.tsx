@@ -26,6 +26,7 @@ import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import type { FindingRow } from '@/app/actions/scan-types';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBatchPurge } from '@/components/dashboard/BatchPurgeContext';
 
 const severityColor: Record<string, { text: string; dot: string }> = {
   critical: { text: 'text-rose-600', dot: 'bg-rose-500' },
@@ -56,6 +57,9 @@ function FindingsStreamInner() {
   const [selectedFinding, setSelectedFinding] = useState<FindingRow | null>(
     null,
   );
+
+  const { isBatchMode, selectedIds, toggleSelection, selectAll } =
+    useBatchPurge();
 
   const { data, isLoading } = useFindings({
     limit: 100,
@@ -102,6 +106,20 @@ function FindingsStreamInner() {
           <table className="w-full text-sm text-left font-manrope">
             <thead className="bg-zinc-50 sticky top-0 z-10 border-b border-zinc-100">
               <tr>
+                {isBatchMode && (
+                  <th className="px-5 py-3 w-10 text-center">
+                    <button
+                      onClick={() =>
+                        selectAll(items.map((i) => i.id.toString()))
+                      }
+                      className="text-[10px] uppercase font-bold tracking-wider text-purple-600 hover:text-purple-800 transition-colors"
+                    >
+                      {selectedIds.length === items.length
+                        ? 'Deselect All'
+                        : 'Select All'}
+                    </button>
+                  </th>
+                )}
                 <th className="px-5 py-3 font-medium text-xs text-zinc-500 uppercase tracking-widest">
                   Severity
                 </th>
@@ -119,9 +137,34 @@ function FindingsStreamInner() {
                 return (
                   <tr
                     key={f.id}
-                    onClick={() => setSelectedFinding(f)}
-                    className="hover:bg-zinc-50 transition-colors group cursor-pointer"
+                    onClick={() => {
+                      if (isBatchMode) {
+                        toggleSelection(f.id.toString());
+                      } else {
+                        setSelectedFinding(f);
+                      }
+                    }}
+                    className={`transition-colors group cursor-pointer ${isBatchMode && selectedIds.includes(f.id.toString()) ? 'bg-purple-50/50 hover:bg-purple-50' : 'hover:bg-zinc-50'}`}
                   >
+                    {isBatchMode && (
+                      <td className="px-5 py-3.5 whitespace-nowrap text-center">
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelection(f.id.toString());
+                          }}
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 mx-auto ${
+                            selectedIds.includes(f.id.toString())
+                              ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
+                              : 'bg-white border-zinc-300 hover:border-violet-400'
+                          }`}
+                        >
+                          {selectedIds.includes(f.id.toString()) && (
+                            <Check size={12} strokeWidth={4} />
+                          )}
+                        </div>
+                      </td>
+                    )}
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1.5 text-xs font-semibold ${colors.text}`}

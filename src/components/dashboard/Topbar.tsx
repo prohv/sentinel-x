@@ -3,10 +3,12 @@
 import { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Search, PlusCircle, Loader2, X } from 'lucide-react';
+import { Search, PlusCircle, Loader2, X, Flame } from 'lucide-react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useStartScan } from '@/hooks/use-start-scan';
 import { useScanDirectories } from '@/hooks/use-scan-directories';
+import { useBatchPurge } from '@/components/dashboard/BatchPurgeContext';
+import { BatchPurgeModal } from '@/components/dashboard/BatchPurgeModal';
 
 const REPO_PATH_KEY = 'sentinel-x-repo-path';
 
@@ -60,6 +62,10 @@ function TopbarInner() {
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [currentRepoPath, setCurrentRepoPath] = useState<string | null>(null);
+
+  const { isBatchMode, setBatchMode, selectedIds } = useBatchPurge();
+  const [showBatchWarning, setShowBatchWarning] = useState(false);
+  const [showBatchPurge, setShowBatchPurge] = useState(false);
 
   useEffect(() => {
     const update = () => setCurrentRepoPath(getCurrentRepoPath());
@@ -139,6 +145,35 @@ function TopbarInner() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3 shrink-0">
+          {!isBatchMode ? (
+            <button
+              onClick={() => setShowBatchWarning(true)}
+              className="flex items-center gap-2 bg-purple-100 text-purple-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors font-manrope shadow-sm"
+            >
+              <Flame size={16} />
+              <span className="hidden sm:inline">Batch Purge</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBatchMode(false)}
+                className="px-4 py-2.5 rounded-lg text-sm font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 transition-colors font-manrope"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowBatchPurge(true)}
+                disabled={selectedIds.length === 0}
+                className="flex items-center gap-2 bg-violet-950 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-violet-900 transition-all font-manrope shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Flame size={16} />
+                <span className="hidden sm:inline">
+                  Purge {selectedIds.length}
+                </span>
+              </button>
+            </div>
+          )}
+
           <button
             onClick={() => setShowDialog(true)}
             className="flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-zinc-800 transition-colors font-manrope shadow-sm"
@@ -150,6 +185,26 @@ function TopbarInner() {
       </header>
 
       {showDialog && <ScanDialog onClose={() => setShowDialog(false)} />}
+
+      {showBatchWarning && (
+        <BatchWarningModal
+          onClose={() => setShowBatchWarning(false)}
+          onAccept={() => {
+            setShowBatchWarning(false);
+            setBatchMode(true);
+          }}
+        />
+      )}
+
+      {showBatchPurge && (
+        <BatchPurgeModal
+          selectedIds={selectedIds}
+          onClose={() => {
+            setShowBatchPurge(false);
+            setBatchMode(false);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -240,6 +295,70 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
             className="w-full rounded-lg bg-violet-600 text-white px-4 py-2.5 text-sm font-medium hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {startScan.isPending ? 'Starting...' : 'Start Scan'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BatchWarningModal({
+  onClose,
+  onAccept,
+}: {
+  onClose: () => void;
+  onAccept: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-6 relative animate-in zoom-in-95 duration-200">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600 p-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-colors"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+            <Flame className="text-rose-500" size={20} />
+          </div>
+          <h3 className="font-epilogue font-bold text-xl text-zinc-900">
+            Batch Purge Mode
+          </h3>
+        </div>
+
+        <div className="space-y-4 font-manrope text-sm text-zinc-600 leading-relaxed bg-zinc-50 border border-zinc-100 p-4 rounded-xl">
+          <p>
+            You are entering <strong>Targeted Batch Mode</strong>. This allows
+            you to select multiple secrets to be permanently eradicated from
+            your repository&apos;s Git history.
+          </p>
+          <ul className="list-disc pl-5 space-y-2 text-rose-700/80 font-medium">
+            <li>Do not push or pull code during this operation.</li>
+            <li>
+              The process will be run sequentially to avoid `.git` lock
+              corruption.
+            </li>
+            <li>
+              This action is irreversible. Ensure you know what you are
+              targeting.
+            </li>
+          </ul>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg font-semibold text-sm text-zinc-600 bg-white border border-zinc-200 shadow-sm hover:bg-zinc-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onAccept}
+            className="px-4 py-2 rounded-lg font-semibold text-sm text-white bg-rose-600 hover:bg-rose-500 shadow-sm transition-colors"
+          >
+            I understand, Proceed
           </button>
         </div>
       </div>
