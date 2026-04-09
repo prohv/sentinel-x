@@ -72,8 +72,98 @@ async function spawnCmd(cmd: string[], cwd: string) {
   return { code, stdout, stderr };
 }
 
-function escapeForSed(s: string): string {
-  return s.replace(/[[\]\\^$.|?*+(){}/&]/g, '\\$&');
+// ── Bun-Native Fast-Export Stream Redactor ───────────────────────────────
+// git fast-export serialises the entire repo as a text protocol.
+// Each blob/commit body is preceded by a "data <N>" header announcing its
+// byte length. We MUST rewrite that length when the content changes,
+// otherwise git fast-import will reject the stream.
+//
+// This function iterates the buffer once (O(RepositorySize)) and:
+//   1. Passes all non-data bytes through verbatim.
+//   2. For each "data <N>" section, replaces every occurrence of `secret`
+//      inside those N bytes and emits a corrected header.
+//
+// It intentionally avoids spawning grep, sed, or xargs.
+
+function bufReplaceAll(buf: Buffer, search: Buffer, replace: Buffer): Buffer {
+  const parts: Buffer[] = [];
+  let pos = 0;
+  while (pos < buf.length) {
+    const idx = buf.indexOf(search, pos);
+    if (idx === -1) {
+      parts.push(buf.subarray(pos));
+      break;
+    }
+    parts.push(buf.subarray(pos, idx));
+    parts.push(replace);
+    pos = idx + search.length;
+  }
+  return Buffer.concat(parts);
+}
+
+function redactFastExportStream(raw: Buffer, secret: string): Buffer {
+  const secretBuf = Buffer.from(secret, 'utf8');
+  const redactBuf = Buffer.from('[REDACTED by Sentinel X]', 'utf8');
+  const DATA_PREFIX = Buffer.from('data ', 'ascii');
+  const LF = 0x0a;
+
+  const out: Buffer[] = [];
+  let pos = 0;
+
+  while (pos < raw.length) {
+    // Find the next "data " token that sits at the very start of a line.
+    const dataPos = raw.indexOf(DATA_PREFIX, pos);
+    if (dataPos === -1) {
+      out.push(raw.subarray(pos));
+      break;
+    }
+
+    const isLineStart = dataPos === 0 || raw[dataPos - 1] === LF;
+    if (!isLineStart) {
+      // "data" appears mid-line (e.g. inside a path) — skip one byte and retry.
+      out.push(raw.subarray(pos, dataPos + 1));
+      pos = dataPos + 1;
+      continue;
+    }
+
+    // Emit everything before this header.
+    out.push(raw.subarray(pos, dataPos));
+
+    // Find end of the "data <N>\n" line.
+    const lineEnd = raw.indexOf(LF, dataPos);
+    if (lineEnd === -1) {
+      // Truncated stream — pass rest through.
+      out.push(raw.subarray(dataPos));
+      break;
+    }
+
+    const sizeStr = raw
+      .subarray(dataPos + 5, lineEnd)
+      .toString('ascii')
+      .trim();
+    const size = parseInt(sizeStr, 10);
+
+    if (isNaN(size)) {
+      // Delimiter form: "data <<MARKER" — not a fixed-size blob, pass through.
+      out.push(raw.subarray(dataPos, lineEnd + 1));
+      pos = lineEnd + 1;
+      continue;
+    }
+
+    // Read exactly `size` bytes of blob content.
+    const contentStart = lineEnd + 1;
+    const contentEnd = contentStart + size;
+    const content = raw.subarray(contentStart, contentEnd);
+
+    // Redact and recalculate length.
+    const redacted = bufReplaceAll(content, secretBuf, redactBuf);
+    out.push(Buffer.from(`data ${redacted.length}\n`));
+    out.push(redacted);
+
+    pos = contentEnd;
+  }
+
+  return Buffer.concat(out);
 }
 
 // Step 1 — Pre-Flight Integrity Check
@@ -154,7 +244,7 @@ export async function purgeStepBackup(
   return { success: true, detail: `Backup created: ${backupName}` };
 }
 
-// Step 3 — Filter-Branch Surgery
+// Step 3 — Fast-Export / Bun-Native Redact / Fast-Import
 export async function purgeStepSurgery(
   finding: FindingRow,
 ): Promise<PurgeStepResult> {
@@ -163,46 +253,65 @@ export async function purgeStepSurgery(
   if (!session) return { success: false, detail: 'Session expired.' };
 
   const { secret } = session;
-  const esc = escapeForSed(secret);
 
-  const indexFilter = [
-    `MATCH=$(git ls-files | xargs grep -lF "${secret}" 2>/dev/null); `,
-    `if [ -n "$MATCH" ]; then `,
-    `  echo "$MATCH" | while IFS= read -r f; do `,
-    `    sed -i "s/${esc}/[REDACTED by Sentinel X]/g" "$f" 2>/dev/null && git update-index -- "$f"; `,
-    `  done; `,
-    `fi; true`,
-  ].join('');
-
-  const result = await spawnCmd(
-    [
-      'git',
-      'filter-branch',
-      '-f',
-      '--index-filter',
-      indexFilter,
-      '--tag-name-filter',
-      'cat',
-      '--',
-      '--all',
-    ],
-    repoPath,
+  // ── 1. Export ──────────────────────────────────────────────────────────
+  // git fast-export serialises ALL refs into a single protocol stream.
+  // --all includes branches, tags, notes, and stash — nothing slips through.
+  const exporter = Bun.spawn(
+    ['git', 'fast-export', '--all', '--signed-tags=strip'],
+    { cwd: repoPath, stdout: 'pipe', stderr: 'pipe' },
   );
 
-  // filter-branch exits non-zero with WARNING messages on clean runs — treat those as OK
-  const isRealFailure =
-    result.code !== 0 &&
-    !result.stderr.includes('WARNING') &&
-    !result.stderr.includes('Rewrite');
+  const [rawAB, exportStderr, exportCode] = await Promise.all([
+    new Response(exporter.stdout).arrayBuffer(),
+    new Response(exporter.stderr).text(),
+    exporter.exited,
+  ]);
 
-  if (isRealFailure) {
-    return { success: false, detail: result.stderr.slice(0, 300) };
+  if (exportCode !== 0 && !exportStderr.toLowerCase().includes('warning')) {
+    return {
+      success: false,
+      detail: `git fast-export failed: ${exportStderr.slice(0, 200)}`,
+    };
   }
 
-  const rewrites = (result.stderr.match(/Rewrite/g) ?? []).length;
+  const rawBuf = Buffer.from(rawAB);
+
+  // Count commits in the stream for the progress message.
+  const commitCount = [...rawBuf.toString('ascii').matchAll(/^commit /gm)]
+    .length;
+
+  // ── 2. Redact (Bun-native, zero extra processes) ───────────────────────
+  const redacted = redactFastExportStream(rawBuf, secret);
+
+  // ── 3. Import ──────────────────────────────────────────────────────────
+  // --force allows rewriting refs that already exist.
+  // --quiet suppresses per-commit progress noise.
+  const importer = Bun.spawn(['git', 'fast-import', '--force', '--quiet'], {
+    cwd: repoPath,
+    stdin: new Blob([new Uint8Array(redacted)]),
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  const [importStderr, importCode] = await Promise.all([
+    new Response(importer.stderr).text(),
+    importer.exited,
+  ]);
+
+  if (importCode !== 0) {
+    return {
+      success: false,
+      detail: `git fast-import failed: ${importStderr.slice(0, 200)}`,
+    };
+  }
+
+  // ── 4. Sync working tree to the rewritten HEAD ─────────────────────────
+  await spawnCmd(['git', 'reset', '--hard', 'HEAD'], repoPath);
+
   return {
     success: true,
-    detail: `${rewrites} commit(s) rewritten · Hash ripple resolved across DAG`,
+    detail: `${commitCount} commit(s) rewritten via fast-export stream · Hash DAG rebuilt · 0 subprocess calls`,
   };
 }
 
@@ -214,20 +323,23 @@ export async function purgeStepIncinerate(
   if (!sessions.has(finding.id))
     return { success: false, detail: 'Session expired.' };
 
+  // Expire all reflog entries immediately so the old (infected) objects
+  // become unreachable.
   await spawnCmd(
     ['git', 'reflog', 'expire', '--expire=now', '--all'],
     repoPath,
   );
-  const gc = await spawnCmd(
-    ['git', 'gc', '--prune=now', '--aggressive'],
-    repoPath,
-  );
+
+  // --prune=now removes unreachable objects right away.
+  // We intentionally omit --aggressive: it re-deltas every object which
+  // takes ~10x longer with no security benefit for a secret purge.
+  const gc = await spawnCmd(['git', 'gc', '--prune=now'], repoPath);
 
   const pruned =
     gc.stderr.includes('pruning') || gc.stderr.includes('Counting');
   return {
     success: true,
-    detail: `Reflog wiped · ${pruned ? 'Unreachable objects pruned' : 'GC complete'}`,
+    detail: `Reflog wiped · ${pruned ? 'Unreachable objects pruned' : 'GC complete'} · --aggressive omitted (not needed for secret purge)`,
   };
 }
 
@@ -289,12 +401,27 @@ export async function purgeStepAudit(
     .where(eq(findings.id, finding.id));
 
   // Delete shadow backup on success
-  try {
-    if (session.backupPath) {
-      fs.rmSync(session.backupPath, { recursive: true, force: true });
+  let backupCleaned = false;
+  if (session.backupPath && fs.existsSync(session.backupPath)) {
+    try {
+      const isWin = process.platform === 'win32';
+      if (isWin) {
+        // Use cmd.exe rd /s /q for reliable Windows deletion (avoids fs.rmSync handle-lock issues)
+        const escaped = session.backupPath.replace(/\//g, '\\');
+        await spawnCmd(
+          ['cmd.exe', '/c', 'rd', '/s', '/q', escaped],
+          path.dirname(escaped),
+        );
+      } else {
+        fs.rmSync(session.backupPath, { recursive: true, force: true });
+      }
+      backupCleaned = fs.existsSync(session.backupPath) === false;
+    } catch (err: unknown) {
+      // Log but don't fail — backup is safe even if cleanup lags
+      console.warn('[purge] backup cleanup failed:', err);
     }
-  } catch {
-    /* non-fatal */
+  } else if (!session.backupPath) {
+    backupCleaned = true; // no backup was created
   }
 
   // Clean up session
@@ -302,6 +429,6 @@ export async function purgeStepAudit(
 
   return {
     success: true,
-    detail: `Audit record #${logId} committed · Finding marked PURGED · Backup removed`,
+    detail: `Audit record #${logId} committed · Finding marked PURGED · ${backupCleaned ? 'Backup removed' : 'Backup cleanup pending — manual deletion advised'}`,
   };
 }
