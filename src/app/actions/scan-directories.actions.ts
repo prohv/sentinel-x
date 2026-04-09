@@ -1,65 +1,89 @@
 'use server';
 
 import { readdir, stat } from 'fs/promises';
-import { join, resolve } from 'path';
+import { join, resolve, basename } from 'path';
 
 export type DirEntry = {
   name: string;
   path: string;
   isGitRepo: boolean;
+  isAutoDetected?: boolean;
 };
 
-export async function scanDirectories(
-  rootPath: string = resolve(process.cwd(), '..'),
-): Promise<
-  { success: true; dirs: DirEntry[] } | { success: false; error: string }
-> {
+async function isGitRepo(dirPath: string): Promise<boolean> {
   try {
-    const entries = await readdir(rootPath, { withFileTypes: true });
+    const gitStat = await stat(join(dirPath, '.git'));
+    return gitStat.isDirectory();
+  } catch {
+    return false;
+  }
+}
 
+export async function scanDirectories(
+  rootPath?: string,
+): Promise<
+  | { success: true; dirs: DirEntry[]; autoPath?: string }
+  | { success: false; error: string }
+> {
+  // Priority: argument → CLI env var → parent of cwd (dev fallback)
+  const scanRoot =
+    rootPath ?? process.env.SENTINEL_SCAN_PATH ?? resolve(process.cwd(), '..');
+
+  try {
     const dirs: DirEntry[] = [];
 
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-
-      // Skip hidden dirs
-      if (entry.name.startsWith('.')) continue;
-
-      // Skip common non-repo directories
-      const skipDirs = new Set([
-        'node_modules',
-        '.next',
-        'dist',
-        'build',
-        '.git',
-        'vendor',
-      ]);
-      if (skipDirs.has(entry.name)) continue;
-
-      const fullPath = join(rootPath, entry.name);
-
-      // Only include if it's a valid git repo (has .git folder)
-      let isGitRepo = false;
-      try {
-        const gitPath = join(fullPath, '.git');
-        const gitStat = await stat(gitPath);
-        isGitRepo = gitStat.isDirectory();
-      } catch {
-        // Not a git repo — skip it entirely
-        continue;
-      }
-
+    // 1. Check if the scanRoot itself is a git repo (zero-config single-repo case)
+    if (await isGitRepo(scanRoot)) {
       dirs.push({
-        name: entry.name,
-        path: fullPath,
-        isGitRepo,
+        name: basename(scanRoot),
+        path: scanRoot,
+        isGitRepo: true,
+        isAutoDetected: true,
       });
     }
 
-    // Sort alphabetically
-    dirs.sort((a, b) => a.name.localeCompare(b.name));
+    // 2. Shallow search — one level deep
+    const entries = await readdir(scanRoot, { withFileTypes: true });
 
-    return { success: true, dirs };
+    const skipDirs = new Set([
+      'node_modules',
+      '.next',
+      'dist',
+      'build',
+      '.git',
+      'vendor',
+    ]);
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('.')) continue;
+      if (skipDirs.has(entry.name)) continue;
+
+      const fullPath = join(scanRoot, entry.name);
+
+      if (!(await isGitRepo(fullPath))) continue;
+
+      // Don't duplicate if scanRoot itself was already added
+      if (!dirs.find((d) => d.path === fullPath)) {
+        dirs.push({
+          name: entry.name,
+          path: fullPath,
+          isGitRepo: true,
+          isAutoDetected: false,
+        });
+      }
+    }
+
+    // Sort: auto-detected first, then alphabetical
+    dirs.sort((a, b) => {
+      if (a.isAutoDetected && !b.isAutoDetected) return -1;
+      if (!a.isAutoDetected && b.isAutoDetected) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    const autoPath = dirs.find((d) => d.isAutoDetected)?.path;
+
+    return { success: true, dirs, autoPath };
   } catch (err) {
     console.error('[scanDirectories] Error:', err);
     return { success: false, error: 'Failed to scan directories.' };
