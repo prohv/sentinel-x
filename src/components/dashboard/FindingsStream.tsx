@@ -14,6 +14,13 @@ import {
   Flame,
   ShieldOff,
   CircleDot,
+  ShieldCheck,
+  Database,
+  History,
+  Search,
+  FileCheck,
+  Check,
+  Activity,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -51,7 +58,7 @@ function FindingsStreamInner() {
   );
 
   const { data, isLoading } = useFindings({
-    limit: 12,
+    limit: 100,
     searchQuery: q,
     status: 'open',
   });
@@ -132,7 +139,7 @@ function FindingsStreamInner() {
                       </p>
                     </td>
                     <td className="px-5 py-3.5 text-right whitespace-nowrap text-zinc-400 text-xs">
-                      {total - items.indexOf(f)}/{total}
+                      {items.indexOf(f) + 1}/{total}
                     </td>
                   </tr>
                 );
@@ -251,7 +258,7 @@ function FindingDialog({
               </p>
               <ul className="text-rose-700 text-xs space-y-1 list-disc list-inside">
                 <li>
-                  All commit hashes in{' '}
+                  Commit hashes related to secret in{' '}
                   <span className="font-mono font-bold">
                     {finding.repoPath?.split(/[/\\]/).pop()}
                   </span>{' '}
@@ -494,13 +501,6 @@ function FindingDialog({
               Flag False Positive
             </button>
             <button
-              onClick={() => setShowPurgeConfirm(true)}
-              disabled={isDeleting || isShielding}
-              className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-white bg-violet-950 rounded-lg shadow-sm hover:bg-violet-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Flame size={15} /> Purge
-            </button>
-            <button
               onClick={handleShield}
               disabled={isDeleting || isShielding}
               className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-white bg-violet-600 rounded-lg shadow-sm hover:bg-violet-500 transition-colors shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -511,6 +511,13 @@ function FindingDialog({
                 <CheckCircle size={16} />
               )}
               Verify &amp; Shield
+            </button>
+            <button
+              onClick={() => setShowPurgeConfirm(true)}
+              disabled={isDeleting || isShielding}
+              className="flex items-center gap-2 px-4 py-2 font-semibold text-sm text-white bg-violet-950 rounded-lg shadow-sm hover:bg-violet-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Flame size={15} /> Purge
             </button>
           </div>
         </div>
@@ -543,7 +550,6 @@ function PurgeProgressModal({
       ),
     );
 
-  // Each await yields a re-render — the user sees each step flip in real time
   useEffect(() => {
     async function run() {
       updateStep('preflight', 'running');
@@ -591,7 +597,6 @@ function PurgeProgressModal({
       setDone(true);
     }
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleClose() {
@@ -601,148 +606,227 @@ function PurgeProgressModal({
   }
 
   const formatTime = (ts?: number) =>
-    ts ? new Date(ts).toLocaleTimeString('en-US', { hour12: false }) : '';
+    ts
+      ? new Date(ts).toLocaleTimeString('en-US', {
+          hour12: false,
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      : '';
 
-  const stepIcon = (status: StepStatus) => {
-    if (status === 'done')
-      return (
-        <span className="text-emerald-500 font-bold text-base leading-none">
-          ✓
-        </span>
-      );
-    if (status === 'failed')
-      return (
-        <span className="text-rose-500 font-bold text-base leading-none">
-          ✗
-        </span>
-      );
+  const getStepIcon = (id: string, status: StepStatus) => {
     if (status === 'running')
-      return <CircleDot size={14} className="text-violet-600 animate-pulse" />;
-    return <span className="text-zinc-300 text-base leading-none">·</span>;
+      return <Loader2 size={16} className="animate-spin text-violet-600" />;
+    if (status === 'failed') return <X size={16} className="text-rose-500" />;
+    if (status === 'done')
+      return <Check size={16} className="text-emerald-500" />;
+
+    const iconProps = { size: 16, className: 'text-zinc-300' };
+    switch (id) {
+      case 'preflight':
+        return <Activity {...iconProps} />;
+      case 'backup':
+        return <Database {...iconProps} />;
+      case 'surgery':
+        return <History {...iconProps} />;
+      case 'incinerate':
+        return <Flame {...iconProps} />;
+      case 'verify':
+        return <Search {...iconProps} />;
+      case 'audit':
+        return <FileCheck {...iconProps} />;
+      default:
+        return <CircleDot {...iconProps} />;
+    }
   };
 
   const isRunning = steps.some((s) => s.status === 'running');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-zinc-200 animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
+      <div className="bg-white rounded-[24px] w-full max-w-lg shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden border border-zinc-200/50 flex flex-col animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-zinc-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="bg-zinc-50/50 px-8 py-4 border-b border-zinc-100 relative">
+          <div className="flex items-center gap-4">
             <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center ${done ? (overallSuccess ? 'bg-emerald-100' : 'bg-rose-100') : 'bg-violet-100'}`}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-colors duration-500 ${
+                done
+                  ? overallSuccess
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-rose-500 text-white'
+                  : 'bg-violet-950 text-white'
+              }`}
             >
-              <Flame
-                size={17}
-                className={
-                  done
-                    ? overallSuccess
-                      ? 'text-emerald-600'
-                      : 'text-rose-600'
-                    : 'text-violet-600'
-                }
-              />
+              {done ? (
+                overallSuccess ? (
+                  <ShieldCheck size={20} />
+                ) : (
+                  <AlertTriangle size={20} />
+                )
+              ) : (
+                <Flame size={20} className="animate-pulse" />
+              )}
             </div>
-            <div>
-              <p className="font-epilogue font-bold text-zinc-900 text-sm">
+            <div className="flex-1">
+              <h3 className="font-epilogue font-bold text-zinc-900 text-lg leading-tight">
                 {done
                   ? overallSuccess
                     ? 'Sanitization Complete'
-                    : 'Purge Failed'
-                  : 'Purge in Progress…'}
-              </p>
-              <p className="text-zinc-400 text-xs font-mono mt-0.5 truncate max-w-[280px]">
-                {finding.rule} ·{' '}
-                {finding.path.split(/[/\\]/).slice(-2).join('/')}
+                    : 'Purge Intervention Failed'
+                  : 'Irreversible Sanitization'}
+              </h3>
+              <p className="text-zinc-500 text-xs font-manrope mt-1 flex items-center gap-1.5">
+                <span className="font-mono text-[10px] bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-600">
+                  {finding.commitHash?.substring(0, 7) || 'N/A'}
+                </span>
+                <span className="text-zinc-300">•</span>
+                <span className="truncate max-w-[200px]">
+                  {finding.path.split(/[/\\]/).pop()}
+                </span>
               </p>
             </div>
           </div>
+
           {isRunning && (
-            <Loader2
-              size={16}
-              className="text-violet-500 animate-spin shrink-0"
-            />
+            <div className="absolute bottom-0 left-0 h-[2px] bg-violet-600/30 w-full overflow-hidden">
+              <div
+                className="h-full bg-violet-600 animate-[loading_2s_infinite_linear]"
+                style={{ width: '40%' }}
+              ></div>
+            </div>
           )}
         </div>
 
-        {/* Steps */}
-        <div className="px-6 py-5 space-y-3.5">
-          {steps.map((s) => (
-            <div key={s.id}>
-              <div className="flex items-center gap-3">
-                <div className="w-5 flex items-center justify-center shrink-0">
-                  {stepIcon(s.status)}
-                </div>
-                <p
-                  className={`text-sm flex-1 font-manrope ${
-                    s.status === 'done'
-                      ? 'text-zinc-700'
-                      : s.status === 'failed'
-                        ? 'text-rose-600 font-medium'
-                        : s.status === 'running'
-                          ? 'text-violet-700 font-semibold'
-                          : 'text-zinc-300'
+        {/* Steps Timeline */}
+        <div className="px-8 py-5 space-y-0 relative">
+          {steps.map((s, idx) => (
+            <div
+              key={s.id}
+              className="relative flex items-start gap-5 pb-4 last:pb-0 transition-all duration-300"
+            >
+              {/* Vertical Connector Segment */}
+              {idx < steps.length - 1 && (
+                <div
+                  className={`absolute left-[15.5px] top-[32px] bottom-0 w-px transition-colors duration-300 ${
+                    s.status === 'done' ? 'bg-emerald-200' : 'bg-zinc-100'
                   }`}
-                >
-                  {s.label}
-                </p>
-                {s.ts && (
-                  <span className="text-zinc-400 text-[10px] font-mono shrink-0">
-                    {formatTime(s.ts)}
-                  </span>
+                />
+              )}
+              <div
+                className={`z-10 w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 shadow-sm ${
+                  s.status === 'done'
+                    ? 'bg-emerald-50 border-emerald-100'
+                    : s.status === 'running'
+                      ? 'bg-violet-50 border-violet-200 ring-2 ring-violet-50'
+                      : s.status === 'failed'
+                        ? 'bg-rose-50 border-rose-100 shadow-rose-100/50'
+                        : 'bg-white border-zinc-100'
+                } ${s.status === 'pending' ? 'opacity-40' : 'opacity-100'}`}
+              >
+                {getStepIcon(s.id, s.status)}
+              </div>
+
+              <div
+                className={`flex-1 pt-0.5 transition-opacity duration-300 ${s.status === 'pending' ? 'opacity-40' : 'opacity-100'}`}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <p
+                    className={`text-sm font-semibold font-epilogue transition-colors ${
+                      s.status === 'done'
+                        ? 'text-zinc-700'
+                        : s.status === 'running'
+                          ? 'text-violet-950'
+                          : s.status === 'failed'
+                            ? 'text-rose-600'
+                            : 'text-zinc-400'
+                    }`}
+                  >
+                    {s.label}
+                  </p>
+                  {s.ts && (
+                    <span className="text-[10px] font-mono text-zinc-400 bg-zinc-50 px-2 py-0.5 rounded-full border border-zinc-100">
+                      {formatTime(s.ts)}
+                    </span>
+                  )}
+                </div>
+                {s.detail && (
+                  <p className="mt-1 text-[11px] text-zinc-400 font-manrope leading-relaxed">
+                    {s.detail}
+                  </p>
                 )}
               </div>
-              {s.detail && (
-                <p className="ml-8 mt-1 text-[11px] text-zinc-400 leading-relaxed font-mono">
-                  └ {s.detail}
-                </p>
-              )}
             </div>
           ))}
         </div>
 
-        {/* Result banner */}
+        {/* Result Banner */}
         {done && (
-          <div
-            className={`mx-6 mb-5 rounded-xl px-4 py-3 text-sm font-semibold flex items-center gap-2 ${
-              !overallSuccess
-                ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                : pristine
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : 'bg-amber-50 text-amber-700 border border-amber-200'
-            }`}
-          >
-            {!overallSuccess ? (
-              <>
-                <ShieldOff size={15} className="shrink-0" /> Purge failed —
-                shadow backup preserved for manual recovery
-              </>
-            ) : pristine ? (
-              <>
-                <CheckCircle size={15} className="shrink-0" /> PRISTINE — Secret
-                confirmed absent from all reachable history
-              </>
-            ) : (
-              <>
-                <AlertTriangle size={15} className="shrink-0" /> PARTIAL —
-                Traces may remain in edge branches. Manual review advised.
-              </>
-            )}
+          <div className="px-8 pb-3">
+            <div
+              className={`p-3 rounded-xl flex items-start gap-2.5 border animate-in slide-in-from-bottom-2 duration-500 ${
+                !overallSuccess
+                  ? 'bg-rose-50 border-rose-100 text-rose-800'
+                  : pristine
+                    ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
+                    : 'bg-amber-50 border-amber-100 text-amber-800'
+              }`}
+            >
+              <div className="mt-0.5">
+                {!overallSuccess ? (
+                  <ShieldOff size={14} />
+                ) : pristine ? (
+                  <ShieldCheck size={14} />
+                ) : (
+                  <AlertTriangle size={14} />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-xs leading-none">
+                  {!overallSuccess
+                    ? 'Critical Failure'
+                    : pristine
+                      ? 'Repository Sanitized'
+                      : 'Partial Clearance'}
+                </p>
+                <p className="text-[10px] opacity-80 mt-1 font-manrope leading-tight">
+                  {!overallSuccess
+                    ? 'Surgery aborted. Shadow backup preserved.'
+                    : pristine
+                      ? 'Secret removed from the entire history. Repo is safe.'
+                      : 'Main history clean; check edge branches.'}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Close — appears only after completion */}
-        {done && (
-          <div className="px-6 pb-6">
-            <button
-              onClick={handleClose}
-              className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-semibold transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        )}
+        {/* Action Button */}
+        <div className="px-8 py-4 bg-zinc-50/30 border-t border-zinc-100">
+          <button
+            onClick={done ? handleClose : undefined}
+            disabled={!done}
+            className={`w-full py-3.5 rounded-2xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
+              done
+                ? 'bg-zinc-900 text-white hover:bg-zinc-800 hover:shadow-lg shadow-zinc-900/10'
+                : 'bg-zinc-100 text-zinc-400 cursor-not-allowed'
+            }`}
+          >
+            {done ? 'Decommission Monitor' : 'Sequencing History…'}
+            {done && <CheckCircle size={16} />}
+          </button>
+        </div>
       </div>
+
+      <style jsx>{`
+        @keyframes loading {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(250%);
+          }
+        }
+      `}</style>
     </div>
   );
 }
