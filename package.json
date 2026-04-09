@@ -1,6 +1,6 @@
 {
   "name": "sentinel-x",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Local-first secret scanner. Finds leaked secrets, maps their propagation, and surgically rewrites git history to purge them.",
   "bin": {
     "sentinel": "./dist/cli.js"
