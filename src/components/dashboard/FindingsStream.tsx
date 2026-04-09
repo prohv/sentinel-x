@@ -23,7 +23,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { FindingRow } from '@/app/actions/scan-types';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -550,7 +550,12 @@ function PurgeProgressModal({
       ),
     );
 
+  const hasRun = useRef(false);
+
   useEffect(() => {
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     async function run() {
       updateStep('preflight', 'running');
       const r1 = await purgeStepPreFlight(finding);

@@ -403,22 +403,42 @@ export async function purgeStepAudit(
   // Delete shadow backup on success
   let backupCleaned = false;
   if (session.backupPath && fs.existsSync(session.backupPath)) {
-    try {
-      const isWin = process.platform === 'win32';
-      if (isWin) {
-        // Use cmd.exe rd /s /q for reliable Windows deletion (avoids fs.rmSync handle-lock issues)
-        const escaped = session.backupPath.replace(/\//g, '\\');
-        await spawnCmd(
-          ['cmd.exe', '/c', 'rd', '/s', '/q', escaped],
-          path.dirname(escaped),
-        );
-      } else {
-        fs.rmSync(session.backupPath, { recursive: true, force: true });
+    let retries = 3;
+    while (fs.existsSync(session.backupPath) && retries > 0) {
+      try {
+        const isWin = process.platform === 'win32';
+        if (isWin) {
+          const escaped = session.backupPath.replace(/\//g, '\\');
+          // Important: Don't set cwd to parent folder to avoid handle locks, quote the path.
+          await spawnCmd(
+            ['cmd.exe', '/c', `rd /s /q "${escaped}"`],
+            process.cwd(),
+          );
+          // Fallback node cleanup
+          if (fs.existsSync(session.backupPath)) {
+            fs.rmSync(session.backupPath, {
+              recursive: true,
+              force: true,
+              maxRetries: 3,
+            });
+          }
+        } else {
+          fs.rmSync(session.backupPath, { recursive: true, force: true });
+        }
+      } catch (err: unknown) {
+        // Ignore and retry
       }
-      backupCleaned = fs.existsSync(session.backupPath) === false;
-    } catch (err: unknown) {
-      // Log but don't fail — backup is safe even if cleanup lags
-      console.warn('[purge] backup cleanup failed:', err);
+
+      if (fs.existsSync(session.backupPath)) {
+        await new Promise((r) => setTimeout(r, 1000));
+        retries--;
+      }
+    }
+    backupCleaned = fs.existsSync(session.backupPath) === false;
+    if (!backupCleaned) {
+      console.warn(
+        `[purge] backup cleanup failed after retries for: ${session.backupPath}`,
+      );
     }
   } else if (!session.backupPath) {
     backupCleaned = true; // no backup was created
