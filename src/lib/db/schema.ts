@@ -42,6 +42,21 @@ export const secretsRegistry = sqliteTable('secrets_registry', {
   keyName: text('key_name').notNull().unique(), // env key name e.g. DATABASE_URL
 });
 
+export const purgeLog = sqliteTable('purge_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  findingId: integer('finding_id').references(() => findings.id, {
+    onDelete: 'set null',
+  }),
+  repoPath: text('repo_path').notNull(),
+  affectedPath: text('affected_path').notNull(), // relative file path — never the secret
+  ruleMatched: text('rule_matched').notNull(), // e.g. "Stripe Secret Key"
+  status: text('status').notNull().default('running'), // 'running' | 'success' | 'failed'
+  pristine: integer('pristine').notNull().default(0), // 1 = mini-scan confirmed clean
+  errorMessage: text('error_message'),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+});
+
 //Relations
 export const scansRelations = relations(scans, ({ many }) => ({
   findings: many(findings),
@@ -53,59 +68,3 @@ export const findingsRelations = relations(findings, ({ one }) => ({
     references: [scans.id],
   }),
 }));
-
-//auth
-export const user = sqliteTable('user', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  emailVerified: integer('email_verified', { mode: 'boolean' }).notNull(),
-  image: text('image'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-  role: text('role').notNull().default('user'),
-});
-
-export const session = sqliteTable('session', {
-  id: text('id').primaryKey(),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-  token: text('token').notNull().unique(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-});
-
-export const account = sqliteTable('account', {
-  id: text('id').primaryKey(),
-  accountId: text('account_id').notNull(),
-  providerId: text('provider_id').notNull(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  accessToken: text('access_token'),
-  refreshToken: text('refresh_token'),
-  idToken: text('id_token'),
-  accessTokenExpiresAt: integer('access_token_expires_at', {
-    mode: 'timestamp',
-  }),
-  refreshTokenExpiresAt: integer('refresh_token_expires_at', {
-    mode: 'timestamp',
-  }),
-  scope: text('scope'),
-  password: text('password'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-});
-
-export const verification = sqliteTable('verification', {
-  id: text('id').primaryKey(),
-  identifier: text('identifier').notNull(),
-  value: text('value').notNull(),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }),
-});

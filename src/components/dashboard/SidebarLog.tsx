@@ -1,15 +1,10 @@
 'use client';
 
-import {
-  Settings,
-  DownloadCloud,
-  Activity,
-  Clock,
-  Loader2,
-} from 'lucide-react';
+import { FileBarChart2, Activity, Clock, Loader2, History } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
-import { exportFindingsCSV } from '@/app/actions/get-findings.actions';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { ForensicsTriggerModal } from './ForensicsTriggerModal';
 
 const statusStyle: Record<
   string,
@@ -31,54 +26,35 @@ const statusStyle: Record<
 
 export function SidebarLog() {
   const { data, isLoading } = useDashboardStats();
-  const [isExporting, setIsExporting] = useState(false);
+  const router = useRouter();
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [showForensics, setShowForensics] = useState(false);
   const scans = data?.success ? data.scanHistory : [];
   const hasActiveScan = scans.some((s) => s.status === 'running');
 
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      const result = await exportFindingsCSV();
-      if (result.success) {
-        const blob = new Blob([result.csv], {
-          type: 'text/csv;charset=utf-8;',
-        });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute(
-          'download',
-          `sentinel-x-report-${new Date().toISOString().split('T')[0]}.csv`,
-        );
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        alert(result.error);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('An error occurred during export.');
-    } finally {
-      setIsExporting(false);
-    }
+  const handleReportClick = () => {
+    setIsNavigating(true);
+    router.push('/dashboard/report');
   };
 
   return (
     <div className="flex flex-col h-full bg-zinc-50/50">
       {/* Scan History */}
-      <div className="flex-1 px-6 pt-8 pb-6">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="font-epilogue font-semibold text-lg text-zinc-900 flex items-center gap-2">
-            <Activity size={20} className="text-violet-600" />
-            The Sentinel Log
-          </h2>
-          {hasActiveScan && (
-            <span className="text-xs font-manrope font-medium text-violet-600 bg-violet-100 px-2 py-1 rounded-full">
-              Live Monitor
-            </span>
-          )}
-        </div>
+      {/* Heading — pinned, never scrolls */}
+      <div className="shrink-0 px-6 pt-8 pb-4 flex items-center justify-between">
+        <h2 className="font-epilogue font-semibold text-lg text-zinc-900 flex items-center gap-2">
+          <Activity size={20} className="text-violet-600" />
+          The Sentinel Log
+        </h2>
+        {hasActiveScan && (
+          <span className="text-xs font-manrope font-medium text-violet-600 bg-violet-100 px-2 py-1 rounded-full">
+            Live Monitor
+          </span>
+        )}
+      </div>
 
+      {/* Log list — scrolls independently */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="animate-spin text-zinc-300" size={24} />
@@ -88,7 +64,7 @@ export function SidebarLog() {
             No scans yet. Hit &quot;New Scan&quot; to get started.
           </p>
         ) : (
-          <div className="relative mt-6">
+          <div className="relative mt-2">
             <div className="absolute top-2 bottom-0 left-[11px] w-0.5 bg-zinc-200 z-0" />
 
             <div className="space-y-10 relative z-10">
@@ -139,30 +115,49 @@ export function SidebarLog() {
         </h2>
         <div className="flex flex-col gap-3">
           <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleReportClick}
+            disabled={isNavigating}
+            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-violet-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm group hover:border-violet-200 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-600">
-              {isExporting ? (
-                <Loader2 size={16} className="animate-spin" />
+            <div className="w-8 h-8 rounded-lg bg-zinc-100 group-hover:bg-violet-100 flex items-center justify-center text-zinc-600 group-hover:text-violet-600 transition-colors">
+              {isNavigating ? (
+                <Loader2 size={16} className="animate-spin text-violet-600" />
               ) : (
-                <DownloadCloud size={16} />
+                <FileBarChart2 size={16} />
               )}
             </div>
-            <span className="font-medium">
-              {isExporting ? 'Generating...' : 'Export CSV Report'}
-            </span>
+            <div>
+              <span className="font-semibold block text-zinc-900">
+                {isNavigating ? 'Generating...' : 'Export Report'}
+              </span>
+              <span className="text-[11px] text-zinc-400">
+                Management-ready briefing
+              </span>
+            </div>
           </button>
 
-          <button className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm">
-            <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-600">
-              <Settings size={16} />
+          <button
+            onClick={() => setShowForensics(true)}
+            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-violet-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm group hover:border-violet-200"
+          >
+            <div className="w-8 h-8 rounded-lg bg-zinc-100 group-hover:bg-violet-100 flex items-center justify-center text-zinc-600 group-hover:text-violet-600 transition-colors">
+              <History size={16} />
             </div>
-            <span className="font-medium">Rule Configurations</span>
+            <div>
+              <span className="font-semibold block text-zinc-900">
+                Secret Forensics
+              </span>
+              <span className="text-[11px] text-zinc-400">
+                Time-travel Git discovery
+              </span>
+            </div>
           </button>
         </div>
       </div>
+
+      {showForensics && (
+        <ForensicsTriggerModal onClose={() => setShowForensics(false)} />
+      )}
     </div>
   );
 }

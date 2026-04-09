@@ -9,7 +9,7 @@ import { StartScanSchema } from './scan-types';
 export async function startScan(input: unknown): Promise<StartScanResult> {
   const parsed = StartScanSchema.safeParse(input);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0].message };
+    return { success: false, error: parsed.error.issues[0].message };
   }
 
   const { repoPath, scanType } = parsed.data;
@@ -26,6 +26,7 @@ export async function startScan(input: unknown): Promise<StartScanResult> {
       })
       .returning();
 
+    // Run scanner in background, but capture errors for logging
     runScanner(scan.id, repoPath, scanType).catch((err) => {
       console.error(`[startScan] Scanner error on scan ${scan.id}:`, err);
       markScanFailed(scan.id).catch(() => {});
@@ -48,6 +49,9 @@ async function runScanner(
   repoPath: string,
   scanType: ScanType,
 ): Promise<void> {
+  console.log(
+    `[runScanner] Starting scan ${scanId} | type: ${scanType} | path: ${repoPath}`,
+  );
   const { ghostHunter } = await import('@/lib/scanner/ghost-hunter');
   const { scanRecentHistory, auditFullHistory, huntOrphanBlobs } =
     await import('@/lib/scanner/git-scanner');

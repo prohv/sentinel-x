@@ -1,47 +1,82 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
-import {
-  Search,
-  PlusCircle,
-  Loader2,
-  X,
-  Shield,
-  CheckCircle,
-  AlertTriangle,
-} from 'lucide-react';
+import Link from 'next/link';
+import { Search, PlusCircle, Loader2, X, Flame } from 'lucide-react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useStartScan } from '@/hooks/use-start-scan';
-import { useDashboardStats } from '@/hooks/use-dashboard-stats';
-import { shieldAllFindings } from '@/app/actions/get-findings.actions';
-import { useQueryClient } from '@tanstack/react-query';
+import { useScanDirectories } from '@/hooks/use-scan-directories';
+import { useBatchPurge } from '@/components/dashboard/BatchPurgeContext';
+import { BatchPurgeModal } from '@/components/dashboard/BatchPurgeModal';
+
+const REPO_PATH_KEY = 'sentinel-x-repo-path';
+
+function getCurrentRepoPath(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(REPO_PATH_KEY) || '';
+}
+
+function extractRepoName(repoPath: string): string {
+  if (!repoPath) return 'No repository selected';
+  // Extract last folder name from path
+  const parts = repoPath.replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts[parts.length - 1] || repoPath;
+}
 
 type ScanType = 'ghost_hunter' | 'git_recent' | 'git_full' | 'git_orphan';
 
 export function Topbar() {
+  return (
+    <Suspense fallback={<TopbarSkeleton />}>
+      <TopbarInner />
+    </Suspense>
+  );
+}
+
+function TopbarSkeleton() {
+  return (
+    <header className="flex items-center justify-between gap-4 w-full">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 bg-zinc-200 rounded animate-pulse" />
+        <div className="space-y-2">
+          <div className="h-4 w-20 bg-zinc-200 rounded animate-pulse" />
+          <div className="h-3 w-32 bg-zinc-200 rounded animate-pulse" />
+        </div>
+      </div>
+      <div className="hidden md:flex flex-1 max-w-md mx-8">
+        <div className="w-full h-10 bg-zinc-200 rounded-lg animate-pulse" />
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="h-10 w-24 bg-zinc-200 rounded-lg animate-pulse" />
+        <div className="h-10 w-24 bg-zinc-200 rounded-lg animate-pulse" />
+      </div>
+    </header>
+  );
+}
+
+function TopbarInner() {
   const [showDialog, setShowDialog] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
-  const { data: stats } = useDashboardStats();
-  const queryClient = useQueryClient();
-  const [isShieldingAll, setIsShieldingAll] = useState(false);
-  const [showShieldAllSuccess, setShowShieldAllSuccess] = useState(false);
+  const [currentRepoPath, setCurrentRepoPath] = useState<string | null>(null);
 
-  const handleShieldAll = async () => {
-    setIsShieldingAll(true);
-    await shieldAllFindings();
-    setShowShieldAllSuccess(true);
-    queryClient.invalidateQueries({ queryKey: ['findings'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    setIsShieldingAll(false);
+  const { isBatchMode, setBatchMode, selectedIds } = useBatchPurge();
+  const [showBatchWarning, setShowBatchWarning] = useState(false);
+  const [showBatchPurge, setShowBatchPurge] = useState(false);
 
-    setTimeout(() => {
-      setShowShieldAllSuccess(false);
-    }, 4500);
-  };
+  useEffect(() => {
+    const update = () => setCurrentRepoPath(getCurrentRepoPath());
+    // Defer initial read to a callback (not synchronously in effect body)
+    const id = setTimeout(update, 0);
+    const interval = setInterval(update, 1000);
+    return () => {
+      clearTimeout(id);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -61,29 +96,31 @@ export function Topbar() {
     <>
       <header className="flex items-center justify-between gap-4 w-full">
         {/* Left: Logo + Greeting + Repo */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="w-12 h-12 flex items-center justify-center text-white shrink-0 overflow-hidden">
-            <Image
-              src="/logo.svg"
-              alt="Sentinel-X Logo"
-              width={32}
-              height={32}
-              className="object-contain"
-            />
+            <Link href="/">
+              <Image
+                src="/logo.svg"
+                alt="Sentinel-X Logo"
+                width={36}
+                height={36}
+                className="object-contain"
+              />
+            </Link>
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-epilogue font-bold text-lg text-zinc-900 leading-tight">
-                shado
+                Sentinel X
               </h1>
               <span className="bg-violet-100 text-violet-700 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
                 Admin
               </span>
             </div>
-            <p className="font-manrope text-xs text-zinc-500 mt-0.5">
+            <p className="font-manrope text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
               Repository:{' '}
               <span className="font-mono text-zinc-800 font-medium">
-                sentinel-x/core
+                {currentRepoPath ? extractRepoName(currentRepoPath) : '—'}
               </span>
             </p>
           </div>
@@ -108,19 +145,33 @@ export function Topbar() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3 shrink-0">
-          {(stats?.success ? stats.activeThreats : 0) > 0 && (
+          {!isBatchMode ? (
             <button
-              onClick={handleShieldAll}
-              disabled={isShieldingAll}
-              className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-violet-500 transition-colors shadow-sm disabled:opacity-50 shadow-violet-500/20"
+              onClick={() => setShowBatchWarning(true)}
+              className="flex items-center gap-2 bg-purple-100 text-purple-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors font-manrope shadow-sm"
             >
-              {isShieldingAll ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Shield size={16} />
-              )}
-              <span className="hidden sm:inline">Shield All</span>
+              <Flame size={16} />
+              <span className="hidden sm:inline">Batch Purge</span>
             </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBatchMode(false)}
+                className="px-4 py-2.5 rounded-lg text-sm font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 transition-colors font-manrope"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowBatchPurge(true)}
+                disabled={selectedIds.length === 0}
+                className="flex items-center gap-2 bg-violet-950 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-violet-900 transition-all font-manrope shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Flame size={16} />
+                <span className="hidden sm:inline">
+                  Purge {selectedIds.length}
+                </span>
+              </button>
+            </div>
           )}
 
           <button
@@ -133,55 +184,46 @@ export function Topbar() {
         </div>
       </header>
 
-      {showShieldAllSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col items-center justify-center animate-in zoom-in-95 duration-300 overflow-hidden">
-            <div className="p-8 flex flex-col items-center">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-5 ring-8 ring-emerald-50">
-                <CheckCircle className="text-emerald-500" size={32} />
-              </div>
-              <h2 className="font-epilogue font-bold text-xl text-zinc-900 mb-2 text-center">
-                Global Defenses Active!
-              </h2>
-              <p className="text-sm text-zinc-500 text-center font-manrope leading-relaxed mb-6">
-                All outstanding artifact traces have been systematically
-                verified, encrypted, and structurally isolated in the secure
-                Vault registry in bulk.
-              </p>
+      {showDialog && <ScanDialog onClose={() => setShowDialog(false)} />}
 
-              <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-left flex items-start gap-3">
-                <AlertTriangle
-                  className="text-amber-500 shrink-0 mt-0.5"
-                  size={16}
-                />
-                <div>
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-700 mb-1">
-                    Next Steps
-                  </h4>
-                  <p className="text-xs font-medium text-amber-700/80 leading-relaxed">
-                    Be sure to rotate these keys at the provider level soon to
-                    fully secure the repo.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {showBatchWarning && (
+        <BatchWarningModal
+          onClose={() => setShowBatchWarning(false)}
+          onAccept={() => {
+            setShowBatchWarning(false);
+            setBatchMode(true);
+          }}
+        />
       )}
 
-      {showDialog && <ScanDialog onClose={() => setShowDialog(false)} />}
+      {showBatchPurge && (
+        <BatchPurgeModal
+          selectedIds={selectedIds}
+          onClose={() => {
+            setShowBatchPurge(false);
+            setBatchMode(false);
+          }}
+        />
+      )}
     </>
   );
 }
 
 function ScanDialog({ onClose }: { onClose: () => void }) {
-  const [repoPath, setRepoPath] = useState('../sentinel-chaos-demo/chaos-repo');
-  const [scanType, setScanType] = useState<ScanType>('ghost_hunter');
+  const lastRepoPath = getCurrentRepoPath();
   const startScan = useStartScan();
+  const { data: dirsData, isLoading: dirsLoading } = useScanDirectories();
+  const dirs = dirsData?.success ? dirsData.dirs : [];
+
+  const [repoPath, setRepoPath] = useState(
+    lastRepoPath || (dirs.length > 0 ? dirs[0].path : ''),
+  );
+  const [scanType, setScanType] = useState<ScanType>('ghost_hunter');
 
   async function handleStart() {
     const result = await startScan.mutateAsync({ repoPath, scanType });
     if (result.success) {
+      localStorage.setItem(REPO_PATH_KEY, repoPath);
       onClose();
     }
   }
@@ -203,14 +245,26 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Repository Path
+              Repository
             </label>
-            <input
-              value={repoPath}
-              onChange={(e) => setRepoPath(e.target.value)}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
-              placeholder="../path/to/repo"
-            />
+            {dirsLoading ? (
+              <div className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-500">
+                <Loader2 size={14} className="animate-spin" /> Loading
+                repositories...
+              </div>
+            ) : (
+              <select
+                value={repoPath}
+                onChange={(e) => setRepoPath(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
+              >
+                {dirs.map((dir) => (
+                  <option key={dir.path} value={dir.path}>
+                    🔀 {dir.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
@@ -241,6 +295,70 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
             className="w-full rounded-lg bg-violet-600 text-white px-4 py-2.5 text-sm font-medium hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {startScan.isPending ? 'Starting...' : 'Start Scan'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BatchWarningModal({
+  onClose,
+  onAccept,
+}: {
+  onClose: () => void;
+  onAccept: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-6 relative animate-in zoom-in-95 duration-200">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600 p-2 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-colors"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+            <Flame className="text-rose-500" size={20} />
+          </div>
+          <h3 className="font-epilogue font-bold text-xl text-zinc-900">
+            Batch Purge Mode
+          </h3>
+        </div>
+
+        <div className="space-y-4 font-manrope text-sm text-zinc-600 leading-relaxed bg-zinc-50 border border-zinc-100 p-4 rounded-xl">
+          <p>
+            You are entering <strong>Targeted Batch Mode</strong>. This allows
+            you to select multiple secrets to be permanently eradicated from
+            your repository&apos;s Git history.
+          </p>
+          <ul className="list-disc pl-5 space-y-2 text-rose-700/80 font-medium">
+            <li>Do not push or pull code during this operation.</li>
+            <li>
+              The process will be run sequentially to avoid `.git` lock
+              corruption.
+            </li>
+            <li>
+              This action is irreversible. Ensure you know what you are
+              targeting.
+            </li>
+          </ul>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg font-semibold text-sm text-zinc-600 bg-white border border-zinc-200 shadow-sm hover:bg-zinc-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onAccept}
+            className="px-4 py-2 rounded-lg font-semibold text-sm text-white bg-rose-600 hover:bg-rose-500 shadow-sm transition-colors"
+          >
+            I understand, Proceed
           </button>
         </div>
       </div>

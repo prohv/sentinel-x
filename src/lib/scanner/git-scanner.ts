@@ -70,6 +70,7 @@ export async function traceSecret(
     author: string;
     date: string;
     file: string;
+    message: string;
   }[] = [];
 
   try {
@@ -82,7 +83,7 @@ export async function traceSecret(
     );
 
     for (const entry of pickaxe.split('\n').filter(Boolean)) {
-      const [hash, author, date, subject] = entry.split('|');
+      const [hash, author, date, message] = entry.split('|');
       if (!hash) continue;
 
       //to find which file changed in this commit
@@ -99,6 +100,7 @@ export async function traceSecret(
         commitHash: hash,
         author: author ?? '',
         date: date ?? '',
+        message: message ?? '',
         file,
       });
     }
@@ -119,15 +121,19 @@ export async function scanRecentHistory(
   repoPath: string,
   depth: number = COMMIT_DEPTH,
 ): Promise<GitCommitFinding[]> {
+  console.log(`[scanRecentHistory] Scanning: ${repoPath}, depth: ${depth}`);
   const git = simpleGit(repoPath);
   const findings: GitCommitFinding[] = [];
 
   let log;
   try {
     log = await git.log({ maxCount: depth });
-  } catch {
+  } catch (err) {
+    console.error('[scanRecentHistory] Failed to read git log:', err);
     return [];
   }
+
+  console.log(`[scanRecentHistory] Found ${log.all.length} commits`);
 
   for (const commit of log.all) {
     const diff = await git.show([commit.hash, '--unified=0']);
@@ -149,6 +155,7 @@ export async function scanRecentHistory(
     }
   }
 
+  console.log(`[scanRecentHistory] Total findings: ${findings.length}`);
   return findings;
 }
 
@@ -161,6 +168,8 @@ export async function* auditFullHistory(
   { totalScanned: number; checkpoint: string | null },
   unknown
 > {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _checkpoint = _fromCheckpoint;
   let totalScanned = 0;
   let checkpoint: string | null = null;
 
@@ -178,11 +187,22 @@ export async function* auditFullHistory(
   );
 
   if (!proc.stdout) {
+    console.error('[auditFullHistory] No stdout from git log');
     return { totalScanned: 0, checkpoint: null };
   }
 
   proc.stderr?.on('data', (data: Buffer) => {
-    console.error('[auditFullHistory]', data.toString());
+    console.error('[auditFullHistory] git stderr:', data.toString());
+  });
+
+  proc.on('error', (err) => {
+    console.error('[auditFullHistory] Process error:', err);
+  });
+
+  proc.on('exit', (code) => {
+    if (code !== 0) {
+      console.error(`[auditFullHistory] git log exited with code ${code}`);
+    }
   });
 
   const decoder = new TextDecoder();
@@ -264,7 +284,8 @@ export async function* huntOrphanBlobs(
   try {
     const git = simpleGit(repoPath);
     objectsOutput = await git.raw('rev-list', '--objects', '--all', '--reflog');
-  } catch {
+  } catch (err) {
+    console.error('[huntOrphanBlobs] Failed to read git objects:', err);
     return { totalScanned: 0 };
   }
 
