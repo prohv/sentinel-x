@@ -41,10 +41,14 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
         .orderBy(asc(findings.rule)),
 
       db
-        .select({ severity: findings.severity, count: count() })
+        .select({
+          status: findings.status,
+          severity: findings.severity,
+          count: count(),
+        })
         .from(findings)
-        .where(sql`${findings.status} = 'open'`)
-        .groupBy(findings.severity),
+        .where(sql`${findings.status} IN ('open', 'shielded')`)
+        .groupBy(findings.status, findings.severity),
 
       db
         .select({
@@ -84,25 +88,34 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
     const shieldedSecrets = Number(shieldedResult[0]?.count ?? 0);
     const purgedKeys = Number(purgedResult[0]?.count ?? 0);
 
-    // Calculate dynamic security score based on severity weights
+    // Calculate dynamic security score with an emphasis on actual resolution (Purging)
     let penalty = 0;
     for (const row of severityDistResult) {
       const c = Number(row.count);
-      if (row.severity === 'critical') penalty += c * 10;
-      else if (row.severity === 'high') penalty += c * 5;
-      else if (row.severity === 'medium') penalty += c * 2;
-      else if (row.severity === 'low') penalty += c * 1;
+      // Shielding leaves 50% of the penalty intact (tech debt), making it exactly half as effective as purging.
+      const multiplier = row.status === 'shielded' ? 0.5 : 1;
+
+      if (row.severity === 'critical') penalty += c * 10 * multiplier;
+      else if (row.severity === 'high') penalty += c * 5 * multiplier;
+      else if (row.severity === 'medium') penalty += c * 2 * multiplier;
+      else if (row.severity === 'low') penalty += c * 1 * multiplier;
     }
 
-    // Exponential decay curve: steeper decay to lower the score faster.
-    // We massively reward purged keys since they physically remove the risk from history.
-    const effectivePenalty = Math.max(0, penalty - purgedKeys * 25);
+    // Purging completely eradicates risk.
+    // It provides a "hygiene bonus" that can mitigate up to 80% of the active penalty.
+    const maxMitigation = penalty * 0.8;
+    const hygieneBonus = Math.min(maxMitigation, purgedKeys * 5);
+
+    const finalPenalty = penalty - hygieneBonus;
+
+    // Exponential decay curve: using a softer denominator (150) so scores are more forgiving.
+    // E.g., 1 open critical = 93% score. 5 open criticals = 71% score.
     const securityScore =
-      totalFindings === 0
+      totalFindings === 0 && penalty === 0
         ? 100
         : Math.max(
             1,
-            Math.min(100, Math.round(100 * Math.exp(-effectivePenalty / 350))),
+            Math.min(100, Math.round(100 * Math.exp(-finalPenalty / 200))),
           );
 
     return {

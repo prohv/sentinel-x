@@ -331,7 +331,13 @@ function FindingDialog({
   if (successType === 'shield') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col items-center justify-center animate-in zoom-in-95 duration-300 overflow-hidden">
+        <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col items-center justify-center animate-in zoom-in-95 duration-300 overflow-hidden relative">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-600 bg-zinc-50 hover:bg-zinc-100 rounded-full transition-colors border border-transparent hover:border-zinc-200"
+          >
+            <X size={18} />
+          </button>
           <div className="p-8 flex flex-col items-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-5 ring-8 ring-emerald-50">
               <CheckCircle className="text-emerald-500" size={32} />
