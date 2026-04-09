@@ -215,10 +215,20 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
   const { data: dirsData, isLoading: dirsLoading } = useScanDirectories();
   const dirs = dirsData?.success ? dirsData.dirs : [];
 
-  const [repoPath, setRepoPath] = useState(
-    lastRepoPath || (dirs.length > 0 ? dirs[0].path : ''),
-  );
+  const [repoPath, setRepoPath] = useState<string>(lastRepoPath || '');
   const [scanType, setScanType] = useState<ScanType>('ghost_hunter');
+
+  // Auto-select the detected repo if it's the first time
+  useEffect(() => {
+    if (lastRepoPath || repoPath) return;
+
+    if (dirsData?.success && dirsData.autoPath) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRepoPath(dirsData.autoPath);
+    } else if (dirs.length > 0) {
+      setRepoPath(dirs[0].path);
+    }
+  }, [dirsData, lastRepoPath, repoPath, dirs]);
 
   async function handleStart() {
     const result = await startScan.mutateAsync({ repoPath, scanType });
@@ -260,7 +270,7 @@ function ScanDialog({ onClose }: { onClose: () => void }) {
               >
                 {dirs.map((dir) => (
                   <option key={dir.path} value={dir.path}>
-                    🔀 {dir.name}
+                    🔀 {dir.name} {dir.isAutoDetected ? '(Auto-detected)' : ''}
                   </option>
                 ))}
               </select>

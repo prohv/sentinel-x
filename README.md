@@ -1,6 +1,43 @@
 # Sentinel-X
 
+### The Sovereign Security Layer for Your Codebase.
+
 > Local-first secret hunter and taint scanner for codebases. Finds leaked secrets, maps their propagation through code, and surgically rewrites git history to purge them — without sending a byte to the cloud.
+
+---
+
+## Global CLI Installation
+
+Sentinel-X is now a professional-grade CLI tool. You can run it instantly:
+
+```bash
+# Run once via bunx (Recommended)
+bunx sentinel-x
+
+# Or install globally
+npm install -g sentinel-x
+# then run
+sentinel
+```
+
+---
+
+## CLI Commands
+
+| Command | Action |
+|---|---|
+| `sentinel` | Start the dashboard server and open the landing page |
+| `sentinel dash` | Start the dashboard server and jump directly to `/dashboard` |
+| `sentinel scan [path]` | Run a pure terminal scan on a directory (no UI) |
+
+---
+
+## Infrastructure: The Garrison Home
+
+Sentinel-X follows a "Infrastructure Thinking" approach:
+- **Global Database:** All findings across all repositories are stored in `~/.sentinel-x/garrison.db`.
+- **Zero-Config Discovery:** When run from a repository folder, the CLI automatically detects and pre-selects the repo in the dashboard.
+- **Standalone Runtime:** Optimized for speed using Bun, with a minimal distribution footprint.
 
 ---
 

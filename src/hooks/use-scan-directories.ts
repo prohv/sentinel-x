@@ -4,7 +4,8 @@ import type { DirEntry } from '@/app/actions/scan-directories.actions';
 
 export function useScanDirectories() {
   return useQuery<
-    { success: true; dirs: DirEntry[] } | { success: false; error: string }
+    | { success: true; dirs: DirEntry[]; autoPath?: string }
+    | { success: false; error: string }
   >({
     queryKey: ['directories'],
     queryFn: () => scanDirectories(),

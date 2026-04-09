@@ -4,7 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [3.1.0-beta] — 2026-04-09
+## [3.2.0] — 2026-04-09
+
+### Added
+
+#### Sovereign CLI Infrastructure
+- **"Herald" CLI Wrapper:** Implemented a professional `commander`-based CLI (`sentinel`)
+- **Global Home:** Database moved from project local to `~/.sentinel-x/garrison.db`
+- **Auto-Discovery:** CLI detects git repos in current folder and passes context to UI
+- **Zero-Config UX:** New Scan dialog auto-selects the terminal's CWD as the target
+- **Standalone Build:** Integrated Next.js standalone output for minimal deployments
+- **Auto-Migration:** Self-healing DB migrations run on every startup via `src/lib/db/migrate.ts`
+
+### Changed
+- **Next.js Config:** Fixed deprecated `serverComponentsExternalPackages` warning
+- **DB Initialization:** Standardized WAL mode and synchronous settings for the global Garrison DB
+- **Internal Paths:** All asset resolution moved to `PACKAGE_ROOT`-relative logic for global dist stability
+
+---
+
+## [3.1.0] — 2026-04-09
 
 ### Added
 

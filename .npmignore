@@ -1,0 +1,41 @@
+# Secrets & Environment
+.env*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Databases & Local State
+*.db
+*.db-journal
+*.sqlite*
+.sentinel-x/
+garrison.db
+
+# Dependencies (Pruned version is in standalone)
+node_modules/
+
+# Version Control
+.git/
+.gitignore
+.github/
+
+# Development Tools & Configs
+scripts/
+tests/
+__tests__/
+.vscode/
+.idea/
+.prettierrc
+.eslintrc.json
+tsconfig.json
+
+# Raw Source (We ship dist/ and standalone/)
+src/
+
+# Logs & Temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store

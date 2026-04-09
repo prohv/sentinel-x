@@ -1,65 +1,66 @@
 'use server';
 
-import { readdir, stat } from 'fs/promises';
-import { join, resolve } from 'path';
+import { resolve } from 'path';
+import { discoverRepos, findNearestAnchor } from '@/lib/scanner/discovery';
+import type { DiscoveredRepo } from '@/lib/scanner/discovery';
 
-export type DirEntry = {
-  name: string;
-  path: string;
-  isGitRepo: boolean;
-};
+export type DirEntry = DiscoveredRepo;
 
 export async function scanDirectories(
-  rootPath: string = resolve(process.cwd(), '..'),
+  rootPath?: string,
 ): Promise<
-  { success: true; dirs: DirEntry[] } | { success: false; error: string }
+  | { success: true; dirs: DirEntry[]; autoPath?: string }
+  | { success: false; error: string }
 > {
+  const cwd = process.cwd();
+
+  // 1. Boundary: Handle Upward Traversal to find anchor
+  const anchorPath = await findNearestAnchor(cwd);
+
+  // 2. Resolve Search Root
+  // Priority: argument -> CLI env var -> Detected Anchor -> CWD
+  const scanRoot =
+    rootPath ?? process.env.SENTINEL_SCAN_PATH ?? anchorPath ?? cwd;
+
   try {
-    const entries = await readdir(rootPath, { withFileTypes: true });
+    // 3. Perform Bounded BFS Search
+    const dirs = await discoverRepos(scanRoot);
 
-    const dirs: DirEntry[] = [];
+    // 4. Heuristic: If we are inside a repo, it should be the auto-detected one
+    if (anchorPath) {
+      const anchorInDirs = dirs.find((d) => d.path === anchorPath);
+      if (anchorInDirs) {
+        anchorInDirs.isAutoDetected = true;
+      } else {
+        // If it wasn't in the sub-search but we found it upwardly,
+        // add it explicitly as the "Hero" repo
+        const { basename } = await import('path');
+        const { stat } = await import('fs/promises');
+        const gitPath = resolve(anchorPath, '.git');
+        let isGit = false;
+        try {
+          isGit = (await stat(gitPath)).isDirectory();
+        } catch {}
 
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-
-      // Skip hidden dirs
-      if (entry.name.startsWith('.')) continue;
-
-      // Skip common non-repo directories
-      const skipDirs = new Set([
-        'node_modules',
-        '.next',
-        'dist',
-        'build',
-        '.git',
-        'vendor',
-      ]);
-      if (skipDirs.has(entry.name)) continue;
-
-      const fullPath = join(rootPath, entry.name);
-
-      // Only include if it's a valid git repo (has .git folder)
-      let isGitRepo = false;
-      try {
-        const gitPath = join(fullPath, '.git');
-        const gitStat = await stat(gitPath);
-        isGitRepo = gitStat.isDirectory();
-      } catch {
-        // Not a git repo — skip it entirely
-        continue;
+        dirs.unshift({
+          name: basename(anchorPath),
+          path: anchorPath,
+          isGitRepo: isGit,
+          isAutoDetected: true,
+        });
       }
-
-      dirs.push({
-        name: entry.name,
-        path: fullPath,
-        isGitRepo,
-      });
     }
 
-    // Sort alphabetically
-    dirs.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort: auto-detected first, then alphabetical
+    dirs.sort((a, b) => {
+      if (a.isAutoDetected && !b.isAutoDetected) return -1;
+      if (!a.isAutoDetected && b.isAutoDetected) return 1;
+      return a.name.localeCompare(b.name);
+    });
 
-    return { success: true, dirs };
+    const autoPath = dirs.find((d) => d.isAutoDetected)?.path;
+
+    return { success: true, dirs, autoPath };
   } catch (err) {
     console.error('[scanDirectories] Error:', err);
     return { success: false, error: 'Failed to scan directories.' };
