@@ -1,23 +1,10 @@
 'use server';
 
-import { readdir, stat } from 'fs/promises';
-import { join, resolve, basename } from 'path';
+import { resolve } from 'path';
+import { discoverRepos, findNearestAnchor } from '@/lib/scanner/discovery';
+import type { DiscoveredRepo } from '@/lib/scanner/discovery';
 
-export type DirEntry = {
-  name: string;
-  path: string;
-  isGitRepo: boolean;
-  isAutoDetected?: boolean;
-};
-
-async function isGitRepo(dirPath: string): Promise<boolean> {
-  try {
-    const gitStat = await stat(join(dirPath, '.git'));
-    return gitStat.isDirectory();
-  } catch {
-    return false;
-  }
-}
+export type DirEntry = DiscoveredRepo;
 
 export async function scanDirectories(
   rootPath?: string,
@@ -25,51 +12,41 @@ export async function scanDirectories(
   | { success: true; dirs: DirEntry[]; autoPath?: string }
   | { success: false; error: string }
 > {
-  // Priority: argument → CLI env var → parent of cwd (dev fallback)
+  const cwd = process.cwd();
+
+  // 1. Boundary: Handle Upward Traversal to find anchor
+  const anchorPath = await findNearestAnchor(cwd);
+
+  // 2. Resolve Search Root
+  // Priority: argument -> CLI env var -> Detected Anchor -> CWD
   const scanRoot =
-    rootPath ?? process.env.SENTINEL_SCAN_PATH ?? resolve(process.cwd(), '..');
+    rootPath ?? process.env.SENTINEL_SCAN_PATH ?? anchorPath ?? cwd;
 
   try {
-    const dirs: DirEntry[] = [];
+    // 3. Perform Bounded BFS Search
+    const dirs = await discoverRepos(scanRoot);
 
-    // 1. Check if the scanRoot itself is a git repo (zero-config single-repo case)
-    if (await isGitRepo(scanRoot)) {
-      dirs.push({
-        name: basename(scanRoot),
-        path: scanRoot,
-        isGitRepo: true,
-        isAutoDetected: true,
-      });
-    }
+    // 4. Heuristic: If we are inside a repo, it should be the auto-detected one
+    if (anchorPath) {
+      const anchorInDirs = dirs.find((d) => d.path === anchorPath);
+      if (anchorInDirs) {
+        anchorInDirs.isAutoDetected = true;
+      } else {
+        // If it wasn't in the sub-search but we found it upwardly,
+        // add it explicitly as the "Hero" repo
+        const { basename } = await import('path');
+        const { stat } = await import('fs/promises');
+        const gitPath = resolve(anchorPath, '.git');
+        let isGit = false;
+        try {
+          isGit = (await stat(gitPath)).isDirectory();
+        } catch {}
 
-    // 2. Shallow search — one level deep
-    const entries = await readdir(scanRoot, { withFileTypes: true });
-
-    const skipDirs = new Set([
-      'node_modules',
-      '.next',
-      'dist',
-      'build',
-      '.git',
-      'vendor',
-    ]);
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      if (entry.name.startsWith('.')) continue;
-      if (skipDirs.has(entry.name)) continue;
-
-      const fullPath = join(scanRoot, entry.name);
-
-      if (!(await isGitRepo(fullPath))) continue;
-
-      // Don't duplicate if scanRoot itself was already added
-      if (!dirs.find((d) => d.path === fullPath)) {
-        dirs.push({
-          name: entry.name,
-          path: fullPath,
-          isGitRepo: true,
-          isAutoDetected: false,
+        dirs.unshift({
+          name: basename(anchorPath),
+          path: anchorPath,
+          isGitRepo: isGit,
+          isAutoDetected: true,
         });
       }
     }
