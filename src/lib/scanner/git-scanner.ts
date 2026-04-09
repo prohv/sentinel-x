@@ -82,7 +82,7 @@ export async function traceSecret(
     );
 
     for (const entry of pickaxe.split('\n').filter(Boolean)) {
-      const [hash, author, date] = entry.split('|');
+      const [hash, author, date, message] = entry.split('|');
       if (!hash) continue;
 
       //to find which file changed in this commit
@@ -99,6 +99,7 @@ export async function traceSecret(
         commitHash: hash,
         author: author ?? '',
         date: date ?? '',
+        message: message ?? '',
         file,
       });
     }
