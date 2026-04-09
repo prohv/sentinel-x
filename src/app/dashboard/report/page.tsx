@@ -19,6 +19,8 @@ import {
   Lock,
   Database,
   Wifi,
+  Flame,
+  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { FindingRow } from '@/app/actions/scan-types';
@@ -202,6 +204,7 @@ function ReportContent() {
     activeThreats,
     securityScore,
     shieldedSecrets,
+    purgedKeys,
     ruleDistribution,
     scanHistory,
   } = stats;
@@ -311,7 +314,7 @@ function ReportContent() {
       </div>
 
       {/* ── KPI Strip ── */}
-      <div className="grid grid-cols-3 border-b border-zinc-100">
+      <div className="grid grid-cols-4 border-b border-zinc-100 divide-x divide-zinc-100">
         {[
           {
             label: 'Active Threats',
@@ -321,36 +324,40 @@ function ReportContent() {
             sub: 'Requires immediate action',
           },
           {
-            label: 'Security Coverage',
+            label: 'Security Score',
             value: `${securityScore}%`,
             Icon: TrendingDown,
             color: 'text-violet-600',
-            sub: 'Safe code coverage ratio',
+            sub: 'Risk mitigation index',
           },
           {
-            label: 'Resolved & Shielded',
+            label: 'Vault Shielded',
             value: shieldedSecrets,
             Icon: CheckCircle2,
             color: 'text-emerald-600',
-            sub: 'Secrets secured in Vault',
+            sub: 'Encrypted in Registry',
+          },
+          {
+            label: 'Git Purged',
+            value: purgedKeys,
+            Icon: Flame,
+            color: 'text-violet-700',
+            sub: 'History erased forever',
           },
         ].map(({ label, value, Icon, color, sub }) => (
-          <div
-            key={label}
-            className="px-8 py-6 print:px-6 print:py-4 border-r border-zinc-100 last:border-r-0"
-          >
+          <div key={label} className="px-6 py-6 print:px-5 print:py-4">
             <div className="flex items-start justify-between">
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
                 {label}
               </p>
-              <Icon size={16} className={color} />
+              <Icon size={14} className={color} />
             </div>
             <p
-              className={`font-epilogue font-bold text-4xl print:text-3xl mt-2 ${color}`}
+              className={`font-epilogue font-bold text-3xl print:text-2xl mt-2 ${color}`}
             >
               {value}
             </p>
-            <p className="text-xs text-zinc-400 mt-1 font-manrope">{sub}</p>
+            <p className="text-[10px] text-zinc-400 mt-1 font-manrope">{sub}</p>
           </div>
         ))}
       </div>
@@ -528,55 +535,82 @@ function ReportContent() {
           <tbody className="bg-white divide-y divide-zinc-100 border border-zinc-200 border-t-0">
             <tr>
               <td className="px-5 py-4">
-                <p className="font-semibold text-zinc-900">
-                  {remediationMinutes} min of dev time
+                <p className="font-semibold text-zinc-900 flex items-center gap-2">
+                  <Zap size={14} className="text-amber-500" />
+                  Full History Purge
                 </p>
                 <p className="text-xs text-zinc-500 mt-0.5">
-                  Key rotation across {riskItems.length} exposure
-                  {riskItems.length !== 1 ? 's' : ''}
+                  Irreversible Git history scrub for {activeThreats} keys
                 </p>
               </td>
               <td className="px-5 py-4">
                 <p className="font-semibold text-emerald-700">
-                  100% threat remediation
+                  Maximum Risk Elimination
                 </p>
                 <p className="text-xs text-zinc-500 mt-0.5">
-                  Security grade projected to reach A
+                  Increases score up to 100% efficiency
                 </p>
               </td>
               <td className="px-5 py-4">
                 <p className="font-semibold text-zinc-900">
-                  Prevents unauthorized billing
+                  Zero attack surface
                 </p>
                 <p className="text-xs text-zinc-500 mt-0.5">
-                  Eliminates cloud &amp; payment attack surface
+                  Removes leak from clones & forks
                 </p>
               </td>
             </tr>
-            {shieldedSecrets > 0 && (
-              <tr className="bg-emerald-50/60">
+            {purgedKeys > 0 && (
+              <tr className="bg-violet-50/60">
                 <td className="px-5 py-4">
-                  <p className="font-semibold text-zinc-900">
-                    Already completed
+                  <p className="font-semibold text-violet-900 flex items-center gap-2">
+                    <Flame size={14} className="text-violet-600" />
+                    Success History
                   </p>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    {shieldedSecrets} secrets secured in Vault
+                    {purgedKeys} credentials purged from Git
                   </p>
                 </td>
                 <td className="px-5 py-4">
                   <p className="font-semibold text-emerald-700">
-                    Partial remediation active
+                    Hygiene Bonus Applied
                   </p>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    Encrypted &amp; isolated in registry
+                    Projected safety buffer active
                   </p>
                 </td>
                 <td className="px-5 py-4">
                   <p className="font-semibold text-zinc-900">
-                    Reduced attack window
+                    Sanitized Repository
                   </p>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    Historical exposure contained
+                    Verified clean scan history
+                  </p>
+                </td>
+              </tr>
+            )}
+            {shieldedSecrets > 0 && (
+              <tr className="bg-emerald-50/60">
+                <td className="px-5 py-4">
+                  <p className="font-semibold text-zinc-900">Vault Shielding</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {shieldedSecrets} secrets secured in Registry
+                  </p>
+                </td>
+                <td className="px-5 py-4">
+                  <p className="font-semibold text-emerald-700">
+                    Active Environment Protection
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Encrypted and isolated
+                  </p>
+                </td>
+                <td className="px-5 py-4">
+                  <p className="font-semibold text-zinc-900">
+                    Contained Awareness
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Prevents accidental sprawl
                   </p>
                 </td>
               </tr>
