@@ -8,7 +8,10 @@
   "files": [
     "dist",
     ".next/standalone",
-    "public"
+    ".next/static",
+    "public",
+    "package.json",
+    "README.md"
   ],
   "scripts": {
     "dev": "bun --bun next dev",
