@@ -10,6 +10,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
     const [
       threatResult,
       shieldedResult,
+      purgedResult,
       totalResult,
       ruleDistResult,
       severityDistResult,
@@ -20,11 +21,15 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
         .select({ count: count() })
         .from(findings)
         .where(sql`${findings.status} = 'open'`),
-
       db
         .select({ count: count() })
         .from(findings)
         .where(sql`${findings.status} = 'shielded'`),
+
+      db
+        .select({ count: count() })
+        .from(findings)
+        .where(sql`${findings.status} = 'purged'`),
 
       db.select({ count: count() }).from(findings),
 
@@ -77,6 +82,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
     const totalFindings = Number(totalResult[0]?.count ?? 0);
     const activeThreats = Number(threatResult[0]?.count ?? 0);
     const shieldedSecrets = Number(shieldedResult[0]?.count ?? 0);
+    const purgedKeys = Number(purgedResult[0]?.count ?? 0);
 
     // Calculate dynamic security score based on severity weights
     let penalty = 0;
@@ -89,16 +95,22 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
     }
 
     // Exponential decay curve: steeper decay to lower the score faster.
+    // We massively reward purged keys since they physically remove the risk from history.
+    const effectivePenalty = Math.max(0, penalty - purgedKeys * 25);
     const securityScore =
       totalFindings === 0
         ? 100
-        : Math.max(1, Math.round(100 * Math.exp(-penalty / 350)));
+        : Math.max(
+            1,
+            Math.min(100, Math.round(100 * Math.exp(-effectivePenalty / 350))),
+          );
 
     return {
       success: true,
       activeThreats,
       securityScore,
       shieldedSecrets,
+      purgedKeys,
       ruleDistribution: ruleDistResult,
       recentFindings: recentResult,
       scanHistory: scanHistoryResult,

@@ -29,6 +29,7 @@ body {
 /* Sentinel X Dashboard Gradients */
 .gradient-taint   { background: linear-gradient(135deg, #FF6B6B, #FF8E53); }
 .gradient-clean   { background: linear-gradient(135deg, #6EE7F7, #A78BFA); }
+.gradient-purged  { background: linear-gradient(135deg, #A855F7, #F43F5E); }
 .gradient-neutral { background: linear-gradient(135deg, #E0E7FF, #F0FFFE); }
 
 /* Landing Page — Hero Visual */

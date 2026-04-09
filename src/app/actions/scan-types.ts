@@ -69,6 +69,7 @@ export type DashboardStatsResult =
       activeThreats: number;
       securityScore: number;
       shieldedSecrets: number;
+      purgedKeys: number;
       ruleDistribution: RuleDist[];
       recentFindings: FindingRow[];
       scanHistory: ScanRow[];
