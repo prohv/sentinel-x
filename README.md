@@ -20,7 +20,6 @@ Built as a Next.js dashboard with a streaming scanner engine, it's designed for 
 | **Framework** | [Next.js 16](https://nextjs.org) (App Router) |
 | **UI** | React 19 + Tailwind CSS 4 |
 | **Data** | Drizzle ORM + SQLite (`bun:sqlite`) |
-| **Auth** | Better-Auth (offline mode) |
 | **State** | TanStack React Query |
 | **Validation** | Zod v4 |
 | **Markdown** | Marked v18 |
@@ -73,11 +72,12 @@ bun run db:reset # nuke and recreate current db
 
 ### Scanner Dashboard
 - **Dashboard UI** — polished security scanning dashboard with:
-  - Topbar with repo context, search bar, and mass "Shield All" trigger
+  - Topbar with repo context, search bar, and "New Scan" trigger
   - Vitals cards (active threats, security score, resolved secrets)
   - Rules Distribution chart (Recharts donut breakdown by secret type)
   - Findings Stream table (scrollable feed with severity badges)
   - Sidebar with scan history timeline and quick actions
+  - Taint Tree visualizer — AST propagation flow from secret source to sink
 - **Remediation Hub** — Intelligent Detail Dialog featuring:
   - Exact file path resolution (VCS vs Ghost vs Phantom)
   - Commit author/hash context with live code snippet evidence
@@ -85,7 +85,7 @@ bun run db:reset # nuke and recreate current db
 - **Secure Vault Engine** — Industry-standard structural isolation:
   - **AES-256-GCM** authenticated encryption for shielded artifacts
   - Cryptographic decoupling from the local repository state
-- **Bulk Defenses** — "Shield All" global interaction to secure an entire codebase in one click
+- **Git History Purge** — 6-step pipeline (backup → fast-export redact → fast-import → gc → verify → audit)
 - **Real-time Synchronization** — Unified dashboard metrics with automatic TanStack cache invalidation
 - **Compliance Reporting** — Instant CSV export utility for all discovered and processed findings
 
@@ -108,11 +108,10 @@ bun run db:reset # nuke and recreate current db
   - `auditFullHistory(fromCheckpoint?)` — Full history walk with incremental checkpointing
   - `huntOrphanBlobs()` — Finds secrets in deleted branches and dangling `.git/objects`
 
-### Auth & Security
-- **Better-Auth** — offline email/password auth via Drizzle adapter with SQLite
-- **Bootstrap Admin Setup** — `/setup` page gates on empty user table, creates first admin account
+### Security & Core
 - **Pattern library** — shared rules for GitHub tokens, Stripe keys, AWS keys, private keys, passwords, connection strings, and generic API keys
 - **SQLite via Drizzle** — WAL mode, foreign keys, local-only database
+- **Git History Purge** — `fast-export` → Bun-native redaction → `fast-import` pipeline with forensic verification
 
 ### Developer Experience
 - **Type-safe** — full TypeScript with Zod validation and shared types
@@ -147,13 +146,13 @@ src/
 │   │   ├── dashboard-stats.actions.ts # Dashboard metrics
 │   │   └── scan-types.ts          # Shared scan type definitions
 │   ├── api/                       # API routes
-│   │   └── auth/[...all]/         # Better-Auth catch-all handler
-│   ├── dashboard/                 # Scanner dashboard page
+│   ├── dashboard/                 # Scanner dashboard pages
+│   │   ├── page.tsx               # Main dashboard view
+│   │   ├── forensics/             # Forensics detail page
+│   │   ├── taint-tree/            # Taint tree visualization
+│   │   └── scan-log/              # Scan history page
 │   ├── docs/                      # Documentation viewer
 │   ├── changelog/                 # Changelog display page
-│   ├── setup/                     # Bootstrap admin setup
-│   │   ├── SetupForm.tsx          # Setup form component
-│   │   └── setup.actions.ts       # Setup server action
 │   ├── page.tsx                   # Landing page
 │   ├── layout.tsx                 # Root layout
 │   └── globals.css                # Global styles
@@ -181,11 +180,9 @@ src/
 │   └── use-scan-directories.ts    # Directory scanning hook
 │
 ├── lib/
-│   ├── auth/                      # Better-Auth offline configuration
-│   │   └── index.ts               # Auth config & Drizzle adapter
 │   ├── db/                        # Drizzle schema & SQLite client
 │   │   ├── index.ts               # DB connection (WAL mode, FK)
-│   │   └── schema.ts              # Schema: scans, findings, secrets_registry
+│   │   └── schema.ts              # Schema: scans, findings, secrets_registry, purge_log
 │   ├── scanner/                   # Scanner engines
 │   │   ├── ghost-hunter.ts        # Filesystem secret scanner
 │   │   ├── git-scanner.ts         # Git history scanner

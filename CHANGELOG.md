@@ -38,15 +38,17 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Restructured `src/lib/utils/` → `src/lib/vault/` for clearer security context
-- Organized features into categorized sections (Landing, Dashboard, Scanners, Auth, DX)
+- Organized features into categorized sections (Landing, Dashboard, Scanners, DX)
 - Expanded Tech Stack table with Markdown, Charts, and Fonts entries
 - Updated project structure diagram to reflect actual file layout
 
-### Deprecated
-- **Shield All** — Bulk shield button and success dialog removed from Topbar
+### Removed
+- **Shield All** — Bulk shield button and success dialog removed from Topbar (hydration conflict)
+- **Authentication System** — Better-Auth, `/setup` page, and all auth tables (`user`, `session`, `account`, `verification`) removed. No auth needed for local-first tool
 
 ### Dependencies
 - Added `marked` v18.0.0 for Markdown parsing/rendering
+- Removed `better-auth` — no longer needed
 
 ---
 
