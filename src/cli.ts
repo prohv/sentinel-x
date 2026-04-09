@@ -27,7 +27,15 @@ function getServerPath(): string {
   );
 }
 
-function startServer(openPath: string, scanPath?: string): Promise<void> {
+async function startServer(openPath: string, scanPath?: string): Promise<void> {
+  // Run migrations on the global DB before starting the server
+  try {
+    const { runMigrations } = await import('./lib/db/migrate');
+    await runMigrations();
+  } catch (err) {
+    console.error('[Sentinel-X] Failed to run migrations:', err);
+  }
+
   return new Promise((resolve, reject) => {
     const serverPath = getServerPath();
     const env: NodeJS.ProcessEnv = {
@@ -75,7 +83,7 @@ async function runHeadlessScan(repoPath: string) {
   console.log(`\n🔍  Sentinel-X headless scan → ${target}\n`);
 
   // Import scanner directly — no UI overhead
-  const { runGhostHunter } = await import('./scanner/ghost-hunter');
+  const { runGhostHunter } = await import('./lib/scanner/ghost-hunter');
   const { db } = await import('./lib/db/index');
   const { runMigrations } = await import('./lib/db/migrate');
 
