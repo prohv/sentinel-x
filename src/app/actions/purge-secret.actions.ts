@@ -452,3 +452,54 @@ export async function purgeStepAudit(
     detail: `Audit record #${logId} committed · Finding marked PURGED · ${backupCleaned ? 'Backup removed' : 'Backup cleanup pending — manual deletion advised'}`,
   };
 }
+
+/**
+ * Consolidated action to run the entire 6-step purge pipeline for a single finding.
+ * Essential for batch operations where we want to avoid client-side state orchestration
+ * for every single item in a large queue.
+ */
+export async function purgeSecret(
+  id: number,
+): Promise<{ success: boolean; detail: string }> {
+  try {
+    const findingResult = await db
+      .select()
+      .from(findings)
+      .where(eq(findings.id, id))
+      .limit(1);
+    if (findingResult.length === 0) {
+      return { success: false, detail: `Finding #${id} not found.` };
+    }
+    const finding = findingResult[0] as FindingRow;
+
+    // 1. Pre-Flight
+    const preFlight = await purgeStepPreFlight(finding);
+    if (!preFlight.success) return preFlight;
+
+    // 2. Backup
+    const backup = await purgeStepBackup(finding);
+    if (!backup.success) return backup;
+
+    // 3. Surgery
+    const surgery = await purgeStepSurgery(finding);
+    if (!surgery.success) return surgery;
+
+    // 4. Incinerate
+    const incinerate = await purgeStepIncinerate(finding);
+    if (!incinerate.success) return incinerate;
+
+    // 5. Verify
+    const verify = await purgeStepVerify(finding);
+    if (!verify.success) return verify;
+
+    // 6. Audit & Mark Purged
+    const audit = await purgeStepAudit(finding);
+    return audit;
+  } catch (err) {
+    console.error(`[purgeSecret] error for ID ${id}:`, err);
+    return {
+      success: false,
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
