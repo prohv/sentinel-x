@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { findings, scans } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { traceSecret } from '@/lib/scanner/git-scanner';
+import { type FindingRow } from './scan-types';
+import { type TraceResult } from '@/types/scanner';
 
 // Reusing extraction logic from purge-secret
 const SECRET_PATTERNS: { name: string; regex: RegExp }[] = [
@@ -44,7 +46,16 @@ function extractSecret(snippet: string, ruleName: string): string | null {
   return null;
 }
 
-export async function getSecretForensics(findingId: number) {
+export interface ForensicsResult {
+  success: boolean;
+  finding?: FindingRow;
+  trace?: TraceResult;
+  error?: string;
+}
+
+export async function getSecretForensics(
+  findingId: number,
+): Promise<ForensicsResult> {
   try {
     const result = await db
       .select({

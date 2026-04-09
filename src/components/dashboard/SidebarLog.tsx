@@ -1,15 +1,10 @@
 'use client';
 
-import {
-  Settings,
-  FileBarChart2,
-  Activity,
-  Clock,
-  Loader2,
-} from 'lucide-react';
+import { FileBarChart2, Activity, Clock, Loader2, History } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { ForensicsTriggerModal } from './ForensicsTriggerModal';
 
 const statusStyle: Record<
   string,
@@ -33,6 +28,7 @@ export function SidebarLog() {
   const { data, isLoading } = useDashboardStats();
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
+  const [showForensics, setShowForensics] = useState(false);
   const scans = data?.success ? data.scanHistory : [];
   const hasActiveScan = scans.some((s) => s.status === 'running');
 
@@ -140,14 +136,28 @@ export function SidebarLog() {
             </div>
           </button>
 
-          <button className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-zinc-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm">
-            <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-600">
-              <Settings size={16} />
+          <button
+            onClick={() => setShowForensics(true)}
+            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-violet-50 text-left transition-colors text-sm font-manrope text-zinc-700 bg-white border border-zinc-200 shadow-sm group hover:border-violet-200"
+          >
+            <div className="w-8 h-8 rounded-lg bg-zinc-100 group-hover:bg-violet-100 flex items-center justify-center text-zinc-600 group-hover:text-violet-600 transition-colors">
+              <History size={16} />
             </div>
-            <span className="font-medium">Rule Configurations</span>
+            <div>
+              <span className="font-semibold block text-zinc-900">
+                Secret Forensics
+              </span>
+              <span className="text-[11px] text-zinc-400">
+                Time-travel Git discovery
+              </span>
+            </div>
           </button>
         </div>
       </div>
+
+      {showForensics && (
+        <ForensicsTriggerModal onClose={() => setShowForensics(false)} />
+      )}
     </div>
   );
 }

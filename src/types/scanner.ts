@@ -27,17 +27,20 @@ export interface TraceResult {
     author: string;
     date: string;
     file: string;
+    message: string;
   } | null;
   lastSeen: {
     commitHash: string;
     author: string;
     date: string;
     file: string;
+    message: string;
   } | null;
   touchedCommits: {
     commitHash: string;
     author: string;
     date: string;
     file: string;
+    message: string;
   }[];
 }
