@@ -1,6 +1,6 @@
 {
   "name": "sentinel-x",
-  "version": "1.2.0-beta",
+  "version": "3.1.0-beta",
   "private": true,
   "scripts": {
     "dev": "bun --bun next dev",
