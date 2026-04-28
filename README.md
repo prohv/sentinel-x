@@ -237,8 +237,6 @@ src/
 │
 ├── components/
 │   ├── dashboard/
-│   │   ├── BatchPurgeContext.tsx         # React context for multi-select purge
-│   │   ├── BatchPurgeModal.tsx           # Batch purge workflow modal
 │   │   ├── DashboardVitals.tsx           # Top-level stat cards
 │   │   ├── FindingsStream.tsx            # Scrollable findings table
 │   │   ├── ForensicsTriggerModal.tsx     # Modal to launch forensics view
@@ -291,7 +289,7 @@ src/
 | `scans` | Activity log with checkpoint resume | type, status, startedAt, finishedAt, repoPath, totalFindings, checkpoint |
 | `findings` | Evidence vault with unique fingerprints | rule, severity, path, line, confidence, snippet, fingerprint, status, commitHash, author |
 | `secrets_registry` | `.env` taint baseline for key joins | keyName (unique) |
-| `purge_log` | Audit trail for git history purges | findingId, repoPath, affectedPath, ruleMatched, status, pristine, startedAt, completedAt |
+| `purge_log` | [DEPRECATED] Audit trail for git history purges | findingId, repoPath, affectedPath, ruleMatched, status, pristine, startedAt, completedAt |
 
 ---
 
