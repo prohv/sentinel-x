@@ -45,7 +45,7 @@ Sentinel-X follows a "Infrastructure Thinking" approach:
 
 Sentinel-X scans your repository for hardcoded secrets, API keys, and configuration leaks. It runs entirely **offline** using local SQLite, so your code never leaves your machine.
 
-Built as a Next.js dashboard with streaming scanner engines, an AST-based taint analyzer, and a 6-step git history purge pipeline, it's designed for developers who want real secret discovery and remediation without trusting a third-party SaaS.
+Built as a Next.js dashboard with streaming scanner engines and an AST-based taint analyzer, it's designed for developers who want real secret discovery and remediation without trusting a third-party SaaS.
 
 ---
 
@@ -114,7 +114,6 @@ bun run db:reset # nuke and recreate current db
 - **Rules Distribution** — Recharts donut breakdown by secret type
 - **Findings Stream** — scrollable table with severity badges and row actions
 - **Sidebar Log** — scan history timeline with quick actions
-- **Batch Selection** — checkbox-based multi-select mode for bulk operations
 
 ### Remediation Hub
 - **Intelligent Detail Dialog** per finding:
@@ -135,19 +134,8 @@ bun run db:reset # nuke and recreate current db
 - Supports `git:` blob paths — extracts content from commit diffs for history findings
 - Playback controls to step through the taint flow interactively
 
-### Git History Purge Pipeline
-A 6-step server action pipeline that surgically removes secrets from git history:
-
-| Step | Action | What It Does |
-|---|---|---|
-| 1 | `purgeStepPreFlight` | Validates repo, checks clean working tree, extracts secret |
-| 2 | `purgeStepBackup` | Creates `.git` shadow backup (platform-aware: `xcopy` on Win, `cp` on Unix) |
-| 3 | `purgeStepSurgery` | `fast-export` → Bun-native buffer redaction → `fast-import` (zero subprocess calls) |
-| 4 | `purgeStepIncinerate` | Expires reflog, runs `git gc --prune=now` to permanently delete old objects |
-| 5 | `purgeStepVerify` | Full history scan confirms secret is absent from all reachable commits |
-| 6 | `purgeStepAudit` | Logs to `purge_log` table, marks finding as PURGED, cleans up backup |
-
-- **Batch Purge** (`/dashboard/report`) — multi-select multiple findings and purge them in sequence with retry logic for Windows file-lock issues
+### [DEPRECATED] Git History Purge Pipeline
+The history rewriting pipeline has been deprecated in version 0.4.1. The core logic remains in `src/app/actions/purge-secret.actions.ts` for reference but is no longer exposed via the UI.
 
 ### Reporting (`/dashboard/report`)
 - Business-readable compliance report translating technical rule names into security impact labels

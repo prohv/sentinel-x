@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [0.4.1-alpha] — 2026-04-28
+
+### Deprecated
+
+- **Git History Purge:** The purge feature has been deprecated and removed from the active dashboard. The 6-step history rewriting pipeline is no longer accessible via the UI due to safety and performance concerns with large-scale history rewriting on Windows.
+
 ## [0.4.0-alpha] — 2026-04-09
 
 ### Added

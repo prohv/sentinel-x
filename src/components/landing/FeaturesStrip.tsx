@@ -28,8 +28,8 @@ const FEATURES: Feature[] = [
     icon: Flame,
     iconColor: 'text-violet-600',
     iconBg: 'bg-violet-50',
-    title: 'Git History Purge',
-    body: 'A surgical 6-step pipeline to permanently erase secrets from every commit in your history without corrupting the repo.',
+    title: 'VCS Intelligence',
+    body: 'Reconstruct the lifecycle of any leak across all branches and tags. Sentinel-X finds phantom secrets even if they were deleted months ago.',
   },
   {
     icon: Activity,

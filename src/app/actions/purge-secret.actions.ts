@@ -167,6 +167,7 @@ function redactFastExportStream(raw: Buffer, secret: string): Buffer {
 }
 
 // Step 1 — Pre-Flight Integrity Check
+/** @deprecated Use Shielding instead. Purge feature is deprecated in 0.4.1. */
 export async function purgeStepPreFlight(
   finding: FindingRow,
 ): Promise<PurgeStepResult> {
@@ -215,6 +216,7 @@ export async function purgeStepPreFlight(
 }
 
 // Step 2 — Shadow Backup
+/** @deprecated Use Shielding instead. Purge feature is deprecated in 0.4.1. */
 export async function purgeStepBackup(
   finding: FindingRow,
 ): Promise<PurgeStepResult> {
@@ -245,6 +247,7 @@ export async function purgeStepBackup(
 }
 
 // Step 3 — Fast-Export / Bun-Native Redact / Fast-Import
+/** @deprecated Use Shielding instead. Purge feature is deprecated in 0.4.1. */
 export async function purgeStepSurgery(
   finding: FindingRow,
 ): Promise<PurgeStepResult> {
@@ -316,6 +319,7 @@ export async function purgeStepSurgery(
 }
 
 // Step 4 — Forensic Incineration
+/** @deprecated Use Shielding instead. Purge feature is deprecated in 0.4.1. */
 export async function purgeStepIncinerate(
   finding: FindingRow,
 ): Promise<PurgeStepResult> {
@@ -344,6 +348,7 @@ export async function purgeStepIncinerate(
 }
 
 // Step 5 — Mini-Scan Verification
+/** @deprecated Use Shielding instead. Purge feature is deprecated in 0.4.1. */
 export async function purgeStepVerify(
   finding: FindingRow,
 ): Promise<PurgeStepResult & { pristine: boolean }> {
@@ -370,6 +375,7 @@ export async function purgeStepVerify(
 }
 
 // Step 6 — Sovereign Audit Log
+/** @deprecated Use Shielding instead. Purge feature is deprecated in 0.4.1. */
 export async function purgeStepAudit(
   finding: FindingRow,
 ): Promise<PurgeStepResult> {
@@ -458,6 +464,7 @@ export async function purgeStepAudit(
  * Essential for batch operations where we want to avoid client-side state orchestration
  * for every single item in a large queue.
  */
+/** @deprecated Use Shielding instead. Purge feature is deprecated in 0.4.1. */
 export async function purgeSecret(
   id: number,
 ): Promise<{ success: boolean; detail: string }> {

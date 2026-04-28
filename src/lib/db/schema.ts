@@ -42,6 +42,7 @@ export const secretsRegistry = sqliteTable('secrets_registry', {
   keyName: text('key_name').notNull().unique(), // env key name e.g. DATABASE_URL
 });
 
+/** @deprecated Purge feature is deprecated in 0.4.1. This table is kept for historical logs only. */
 export const purgeLog = sqliteTable('purge_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   findingId: integer('finding_id').references(() => findings.id, {
