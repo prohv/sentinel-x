@@ -12,7 +12,8 @@ export async function getFindings(input: unknown): Promise<FindingsResult> {
     return { success: false, error: parsed.error.issues[0].message };
   }
 
-  const { scanId, severity, limit, offset, searchQuery, status } = parsed.data;
+  const { scanId, severity, limit, offset, searchQuery, status, repoPath } =
+    parsed.data;
 
   try {
     const conditions = [];
@@ -26,6 +27,10 @@ export async function getFindings(input: unknown): Promise<FindingsResult> {
           like(findings.path, `%${searchQuery}%`),
         ),
       );
+    }
+
+    if (repoPath) {
+      conditions.push(eq(scans.repoPath, repoPath));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -53,7 +58,11 @@ export async function getFindings(input: unknown): Promise<FindingsResult> {
         .orderBy(desc(findings.id))
         .limit(limit)
         .offset(offset),
-      db.select({ count: count() }).from(findings).where(whereClause),
+      db
+        .select({ count: count() })
+        .from(findings)
+        .leftJoin(scans, eq(findings.scanId, scans.id))
+        .where(whereClause),
     ]);
 
     return {

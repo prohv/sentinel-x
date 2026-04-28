@@ -1,6 +1,7 @@
 'use client';
 
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
+import { useCurrentRepo } from '@/hooks/use-current-repo';
 import {
   AlertTriangle,
   ShieldCheck,
@@ -10,7 +11,8 @@ import {
 } from 'lucide-react';
 
 export function DashboardVitals() {
-  const { data, isLoading } = useDashboardStats();
+  const repoPath = useCurrentRepo();
+  const { data, isLoading } = useDashboardStats(repoPath);
 
   if (isLoading || !data?.success) {
     return <SkeletonVitals />;
@@ -19,7 +21,7 @@ export function DashboardVitals() {
   const { activeThreats, securityScore, shieldedSecrets } = data;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Card 1: Critical */}
       <div className="gradient-taint rounded-2xl p-6 text-white shadow-md min-h-[180px] flex flex-col justify-between">
         <div className="flex items-start justify-between">

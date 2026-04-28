@@ -2,11 +2,15 @@
 
 import { db } from '@/lib/db';
 import { scans, findings } from '@/lib/db/schema';
-import { desc, count, asc, sql } from 'drizzle-orm';
+import { desc, count, asc, sql, eq, and } from 'drizzle-orm';
 import type { DashboardStatsResult } from './scan-types';
 
-export async function getDashboardStats(): Promise<DashboardStatsResult> {
+export async function getDashboardStats(
+  repoPath?: string,
+): Promise<DashboardStatsResult> {
   try {
+    const repoFilter = repoPath ? eq(scans.repoPath, repoPath) : undefined;
+
     const [
       threatResult,
       shieldedResult,
@@ -20,23 +24,31 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
       db
         .select({ count: count() })
         .from(findings)
-        .where(sql`${findings.status} = 'open'`),
+        .leftJoin(scans, eq(findings.scanId, scans.id))
+        .where(and(sql`${findings.status} = 'open'`, repoFilter)),
       db
         .select({ count: count() })
         .from(findings)
-        .where(sql`${findings.status} = 'shielded'`),
+        .leftJoin(scans, eq(findings.scanId, scans.id))
+        .where(and(sql`${findings.status} = 'shielded'`, repoFilter)),
 
       db
         .select({ count: count() })
         .from(findings)
-        .where(sql`${findings.status} = 'purged'`),
+        .leftJoin(scans, eq(findings.scanId, scans.id))
+        .where(and(sql`${findings.status} = 'purged'`, repoFilter)),
 
-      db.select({ count: count() }).from(findings),
+      db
+        .select({ count: count() })
+        .from(findings)
+        .leftJoin(scans, eq(findings.scanId, scans.id))
+        .where(repoFilter),
 
       db
         .select({ rule: findings.rule, count: count() })
         .from(findings)
-        .where(sql`${findings.status} = 'open'`)
+        .leftJoin(scans, eq(findings.scanId, scans.id))
+        .where(and(sql`${findings.status} = 'open'`, repoFilter))
         .groupBy(findings.rule)
         .orderBy(asc(findings.rule)),
 
@@ -47,7 +59,8 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
           count: count(),
         })
         .from(findings)
-        .where(sql`${findings.status} IN ('open', 'shielded')`)
+        .leftJoin(scans, eq(findings.scanId, scans.id))
+        .where(and(sql`${findings.status} IN ('open', 'shielded')`, repoFilter))
         .groupBy(findings.status, findings.severity),
 
       db
@@ -65,6 +78,8 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
           author: findings.author,
         })
         .from(findings)
+        .leftJoin(scans, eq(findings.scanId, scans.id))
+        .where(repoFilter)
         .orderBy(desc(findings.id))
         .limit(12),
 
@@ -79,6 +94,7 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
           totalFindings: scans.totalFindings,
         })
         .from(scans)
+        .where(repoFilter)
         .orderBy(desc(scans.id))
         .limit(10),
     ]);
@@ -88,11 +104,10 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
     const shieldedSecrets = Number(shieldedResult[0]?.count ?? 0);
     const purgedKeys = Number(purgedResult[0]?.count ?? 0);
 
-    // Calculate dynamic security score with an emphasis on actual resolution (Purging)
+    // Calculate dynamic security score
     let penalty = 0;
     for (const row of severityDistResult) {
       const c = Number(row.count);
-      // Shielding leaves 50% of the penalty intact (tech debt), making it exactly half as effective as purging.
       const multiplier = row.status === 'shielded' ? 0.5 : 1;
 
       if (row.severity === 'critical') penalty += c * 10 * multiplier;
@@ -101,15 +116,11 @@ export async function getDashboardStats(): Promise<DashboardStatsResult> {
       else if (row.severity === 'low') penalty += c * 1 * multiplier;
     }
 
-    // Purging completely eradicates risk.
-    // It provides a "hygiene bonus" that can mitigate up to 80% of the active penalty.
     const maxMitigation = penalty * 0.8;
     const hygieneBonus = Math.min(maxMitigation, purgedKeys * 5);
 
     const finalPenalty = penalty - hygieneBonus;
 
-    // Exponential decay curve: using a softer denominator (150) so scores are more forgiving.
-    // E.g., 1 open critical = 93% score. 5 open criticals = 71% score.
     const securityScore =
       totalFindings === 0 && penalty === 0
         ? 100

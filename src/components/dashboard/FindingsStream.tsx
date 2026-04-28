@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import { useFindings } from '@/hooks/use-findings';
+import { useCurrentRepo } from '@/hooks/use-current-repo';
 import {
   Loader2,
   X,
@@ -41,6 +42,7 @@ export function FindingsStream() {
 }
 
 function FindingsStreamInner() {
+  const repoPath = useCurrentRepo();
   const searchParams = useSearchParams();
   const q = searchParams.get('q') || undefined;
   const queryClient = useQueryClient();
@@ -52,6 +54,7 @@ function FindingsStreamInner() {
     limit: 100,
     searchQuery: q,
     status: 'open',
+    repoPath,
   });
 
   const handleRefresh = () => {

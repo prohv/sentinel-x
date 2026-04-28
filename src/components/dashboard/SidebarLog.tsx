@@ -2,6 +2,7 @@
 
 import { FileBarChart2, Activity, Clock, Loader2, History } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
+import { useCurrentRepo } from '@/hooks/use-current-repo';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ForensicsTriggerModal } from './ForensicsTriggerModal';
@@ -25,7 +26,8 @@ const statusStyle: Record<
 };
 
 export function SidebarLog() {
-  const { data, isLoading } = useDashboardStats();
+  const repoPath = useCurrentRepo();
+  const { data, isLoading } = useDashboardStats(repoPath);
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
   const [showForensics, setShowForensics] = useState(false);

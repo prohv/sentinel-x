@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
+import { useCurrentRepo } from '@/hooks/use-current-repo';
 import { Loader2 } from 'lucide-react';
 
 const RULE_COLORS: Record<string, string> = {
@@ -17,7 +18,8 @@ const RULE_COLORS: Record<string, string> = {
 const DEFAULT_COLOR = '#e4e4e7';
 
 export function RulesDistribution() {
-  const { data, isLoading } = useDashboardStats();
+  const repoPath = useCurrentRepo();
+  const { data, isLoading } = useDashboardStats(repoPath);
 
   if (isLoading || !data?.success) {
     return <SkeletonChart />;
