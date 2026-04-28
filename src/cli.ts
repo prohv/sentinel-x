@@ -125,7 +125,7 @@ async function runHeadlessScan(repoPath: string) {
 program
   .name('sentinel')
   .description('Sentinel-X — Sovereign security scanner for your codebase')
-  .version('3.1.0');
+  .version('0.4.0-alpha');
 
 program
   .command('dash', { isDefault: false })

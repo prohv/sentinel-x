@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [3.2.0] — 2026-04-09
+## [0.4.0-alpha] — 2026-04-09
 
 ### Added
 
@@ -23,7 +23,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [3.1.0] — 2026-04-09
+## [0.3.3-alpha] — 2026-04-09
 
 ### Added
 
@@ -123,7 +123,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.2.0-beta] — 2026-04-09
+## [0.3.2-alpha] — 2026-04-09
 
 ### Added
 - **Landing Page & Public Site:**
@@ -169,7 +169,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [1.1.0-beta] — 2026-04-08
+## [0.3.1-alpha] — 2026-04-08
 
 ### Added
 - **Finding Inspection Hub:** Modular Detail Dialog featuring:
@@ -196,7 +196,7 @@ All notable changes to this project will be documented in this file.
 - Discriminated union handling in Topbar stats polling
 - Redundant logo assets consolidated into single `logo.svg`
 
-## [0.3.0] — 2026-04-08
+## [0.3.0-alpha] — 2026-04-08
 
 ### Added
 - Dashboard UI with 5 polished components:
