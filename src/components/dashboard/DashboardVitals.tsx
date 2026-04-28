@@ -1,6 +1,7 @@
 'use client';
 
 import { useDashboardStats } from '@/hooks/use-dashboard-stats';
+import { useCurrentRepo } from '@/hooks/use-current-repo';
 import {
   AlertTriangle,
   ShieldCheck,
@@ -10,21 +11,17 @@ import {
 } from 'lucide-react';
 
 export function DashboardVitals() {
-  const { data, isLoading } = useDashboardStats();
+  const repoPath = useCurrentRepo();
+  const { data, isLoading } = useDashboardStats(repoPath);
 
   if (isLoading || !data?.success) {
     return <SkeletonVitals />;
   }
 
-  const {
-    activeThreats,
-    securityScore,
-    shieldedSecrets,
-    purgedKeys = 0,
-  } = data;
+  const { activeThreats, securityScore, shieldedSecrets } = data;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Card 1: Critical */}
       <div className="gradient-taint rounded-2xl p-6 text-white shadow-md min-h-[180px] flex flex-col justify-between">
         <div className="flex items-start justify-between">
@@ -74,32 +71,14 @@ export function DashboardVitals() {
           </p>
         </div>
       </div>
-
-      {/* Card 4: Purged */}
-      <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm min-h-[180px] flex flex-col justify-between">
-        <div className="flex items-start justify-between">
-          <p className="font-manrope text-sm font-medium bg-gradient-to-br from-violet-500 to-indigo-600 bg-clip-text text-transparent">
-            Purged Keys
-          </p>
-          <Flame size={20} className="text-violet-500/80" />
-        </div>
-        <div>
-          <p className="font-epilogue font-bold text-5xl bg-gradient-to-br from-violet-500 to-indigo-600 bg-clip-text text-transparent">
-            {purgedKeys}
-          </p>
-          <p className="font-manrope text-xs mt-2 bg-gradient-to-br from-violet-500 to-indigo-600 bg-clip-text text-transparent opacity-80">
-            Forensically removed
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
 
 function SkeletonVitals() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      {[1, 2, 3, 4].map((i) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {[1, 2, 3].map((i) => (
         <div
           key={i}
           className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm min-h-[180px] flex items-center justify-center"

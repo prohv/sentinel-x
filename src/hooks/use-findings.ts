@@ -9,12 +9,18 @@ type FindingsFilters = {
   status?: string;
   limit?: number;
   offset?: number;
+  repoPath?: string | null;
 };
 
 export function useFindings(filters?: FindingsFilters) {
   return useQuery<FindingsResult>({
     queryKey: ['findings', filters],
-    queryFn: () => getFindings(filters),
+    queryFn: () => {
+      // Don't pass explicit null, translate to undefined so Zod works properly
+      const queryPayload = { ...filters };
+      if (queryPayload.repoPath === null) queryPayload.repoPath = undefined;
+      return getFindings(queryPayload);
+    },
     refetchInterval: 5000,
     staleTime: 1000,
   });

@@ -92,4 +92,5 @@ export const FindingsQuerySchema = z.object({
   status: z.string().optional(),
   limit: z.number().int().min(1).max(200).default(50),
   offset: z.number().int().min(0).default(0),
+  repoPath: z.string().optional(),
 });
